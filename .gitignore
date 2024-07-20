@@ -1,0 +1,7 @@
+!**/.gitkeep
+*.swp
+*.swo
+.DS_Store
+Session.vim
+go.work
+

@@ -74,6 +74,8 @@ func (iv *Ivy) execute(ex string) (string, error) {
 }
 
 func (iv *Ivy) Execute(id string, ex string) (string, error) {
+	id = fmt.Sprintf("v%s", id)
+
 	_, err := iv.execute(fmt.Sprintf("%s = %s", id, ex))
 	if err != nil {
 		iv.logError(err)

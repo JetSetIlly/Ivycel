@@ -22,6 +22,7 @@ func NewWorksheet(engine engine.Interface, rows int, columns int) Worksheet {
 		ws.cells[i] = make([]*cells.Cell, columns)
 		for j := 0; j < len(ws.cells[i]); j++ {
 			ws.cells[i][j] = cells.NewCell(ws.engine, cells.Position{Row: i, Column: j})
+			ws.engine.Execute(ws.cells[i][j].Position().Reference(), "0")
 		}
 	}
 

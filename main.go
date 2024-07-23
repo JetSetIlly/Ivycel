@@ -226,6 +226,7 @@ func main() {
 	iv := ivycel{
 		ivy: ivy.New(),
 	}
+
 	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 20, 20)
 	iv.worksheet.User = &worksheetUser{
 		selected:     iv.worksheet.CellEntry(0, 0),

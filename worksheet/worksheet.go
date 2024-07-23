@@ -21,7 +21,7 @@ func NewWorksheet(engine engine.Interface, rows int, columns int) Worksheet {
 	for i := 0; i < len(ws.cells); i++ {
 		ws.cells[i] = make([]*cells.Cell, columns)
 		for j := 0; j < len(ws.cells[i]); j++ {
-			ws.cells[i][j] = cells.NewCell(ws.engine, cells.Position{Row: i, Column: j})
+			ws.cells[i][j] = cells.NewCell(ws.engine, ws, cells.Position{Row: i, Column: j})
 			ws.engine.Execute(ws.cells[i][j].Position().Reference(), "0")
 		}
 	}
@@ -43,4 +43,13 @@ func (ws Worksheet) RecalculateAll() {
 			ws.cells[i][j].Commit()
 		}
 	}
+}
+
+func (ws Worksheet) RelativeCell(root *cells.Cell, pos cells.Position) *cells.Cell {
+	pos.Row += root.Position().Row
+	pos.Column += root.Position().Column
+	if pos.Row >= len(ws.cells) || pos.Column >= len(ws.cells[pos.Row]) {
+		return nil
+	}
+	return ws.cells[pos.Row][pos.Column]
 }

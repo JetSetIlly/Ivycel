@@ -13,6 +13,8 @@ import (
 type ivycel struct {
 	ivy       ivy.Ivy
 	worksheet worksheet.Worksheet
+
+	statusBarHeight int
 }
 
 type worksheetUser struct {
@@ -45,6 +47,7 @@ func (iv *ivycel) layout() {
 	var worksheet *giu.TableWidget
 	{
 		worksheet = giu.Table()
+		worksheet.Size(-1, -1-float32(iv.statusBarHeight))
 
 		rowCt, colCt := iv.worksheet.Size()
 
@@ -127,6 +130,16 @@ func (iv *ivycel) layout() {
 		worksheet.Flags(giu.TableFlagsBorders | giu.TableFlagsScrollY | giu.TableFlagsScrollX)
 	}
 
+	var statusBar *giu.LabelWidget
+	{
+		lastErr := iv.ivy.LastError()
+		if lastErr == nil {
+			statusBar = giu.Label("Ready")
+		} else {
+			statusBar = giu.Label(lastErr.Error())
+		}
+	}
+
 	inputBase, outputBase := iv.ivy.Base()
 
 	w.Layout(
@@ -196,6 +209,16 @@ func (iv *ivycel) layout() {
 			),
 			worksheet,
 		),
+
+		// measure height of status bar
+		giu.Custom(func() {
+			iv.statusBarHeight = giu.GetCursorScreenPos().Y
+		}),
+		giu.Spacing(),
+		statusBar,
+		giu.Custom(func() {
+			iv.statusBarHeight = giu.GetCursorScreenPos().Y - iv.statusBarHeight
+		}),
 	)
 }
 
@@ -203,7 +226,7 @@ func main() {
 	iv := ivycel{
 		ivy: ivy.New(),
 	}
-	iv.worksheet = worksheet.NewWorksheet(iv.ivy, 20, 20)
+	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 20, 20)
 	iv.worksheet.User = &worksheetUser{
 		selected:     iv.worksheet.CellEntry(0, 0),
 		focusFormula: true,

@@ -14,6 +14,8 @@ import (
 	"robpike.io/ivy/value"
 )
 
+const contextName = "ivy"
+
 type Ivy struct {
 	conf    config.Config
 	context value.Context
@@ -39,15 +41,29 @@ func New() Ivy {
 
 	iv.context = exec.NewContext(&iv.conf)
 	iv.SetBase(10, 10)
+
 	return iv
 }
 
-func (iv Ivy) execute(ex string) (string, error) {
+func (iv *Ivy) logError(err error) {
+	spl := strings.SplitN(err.Error(), ":", 3)
+	if len(spl) > 0 {
+		iv.lastErr = errors.New(spl[len(spl)-1])
+	}
+}
+
+func (iv Ivy) LastError() error {
+	return iv.lastErr
+}
+
+func (iv *Ivy) execute(ex string) (string, error) {
+	iv.lastErr = nil
+
 	iv.lastResult.Reset()
 	iv.lastError.Reset()
 
-	scanner := scan.New(iv.context, "ivy", strings.NewReader(ex))
-	parser := parse.NewParser("ivy", scanner, iv.context)
+	scanner := scan.New(iv.context, contextName, strings.NewReader(ex))
+	parser := parse.NewParser(contextName, scanner, iv.context)
 
 	ok := run.Run(parser, iv.context, false)
 	if !ok {
@@ -57,16 +73,16 @@ func (iv Ivy) execute(ex string) (string, error) {
 	return iv.lastResult.String(), nil
 }
 
-func (iv Ivy) Execute(id string, ex string) (string, error) {
+func (iv *Ivy) Execute(id string, ex string) (string, error) {
 	_, err := iv.execute(fmt.Sprintf("%s = %s", id, ex))
 	if err != nil {
-		iv.lastErr = err
+		iv.logError(err)
 		return "", err
 	}
 
 	result, err := iv.execute(id)
 	if err != nil {
-		iv.lastErr = err
+		iv.logError(err)
 		return "", err
 	}
 
@@ -83,8 +99,8 @@ func (iv *Ivy) SetBase(inputBase int, outputBase int) {
 	_, err = iv.execute(fmt.Sprintf(")obase %d", iv.outputBase))
 
 	if err != nil {
-		iv.lastErr = err
-		fmt.Println(err)
+		iv.logError(err)
+		return
 	}
 }
 

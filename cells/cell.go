@@ -1,13 +1,13 @@
 package cells
 
-import "strings"
+import (
+	"strings"
 
-type Engine interface {
-	Execute(id string, ex string) (string, error)
-}
+	"github.com/jetsetilly/ivycel/engine"
+)
 
 type Cell struct {
-	engine   Engine
+	engine   engine.Interface
 	position Position
 
 	Entry  string
@@ -17,7 +17,7 @@ type Cell struct {
 	User any
 }
 
-func NewCell(engine Engine, position Position) *Cell {
+func NewCell(engine engine.Interface, position Position) *Cell {
 	return &Cell{
 		engine:   engine,
 		position: position,

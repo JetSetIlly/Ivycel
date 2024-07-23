@@ -6,7 +6,7 @@ import (
 	imgui "github.com/AllenDang/cimgui-go"
 	"github.com/AllenDang/giu"
 	"github.com/jetsetilly/ivycel/cells"
-	"github.com/jetsetilly/ivycel/ivy"
+	"github.com/jetsetilly/ivycel/engine/ivy"
 	"github.com/jetsetilly/ivycel/worksheet"
 )
 

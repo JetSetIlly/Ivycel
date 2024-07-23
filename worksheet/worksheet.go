@@ -2,20 +2,17 @@ package worksheet
 
 import (
 	"github.com/jetsetilly/ivycel/cells"
+	"github.com/jetsetilly/ivycel/engine"
 )
 
-type Engine interface {
-	Execute(id string, ex string) (string, error)
-}
-
 type Worksheet struct {
-	engine Engine
+	engine engine.Interface
 	cells  [][]*cells.Cell
 
 	User any
 }
 
-func NewWorksheet(engine Engine, rows int, columns int) Worksheet {
+func NewWorksheet(engine engine.Interface, rows int, columns int) Worksheet {
 	ws := Worksheet{
 		engine: engine,
 	}

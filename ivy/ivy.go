@@ -22,6 +22,11 @@ type Ivy struct {
 	lastErrorBuffer  []byte
 	lastResult       *bytes.Buffer
 	lastError        *bytes.Buffer
+
+	inputBase  int
+	outputBase int
+
+	lastErr error
 }
 
 func New() Ivy {
@@ -33,6 +38,7 @@ func New() Ivy {
 	iv.conf.SetErrOutput(iv.lastError)
 
 	iv.context = exec.NewContext(&iv.conf)
+	iv.SetBase(10, 10)
 	return iv
 }
 
@@ -54,13 +60,34 @@ func (iv Ivy) execute(ex string) (string, error) {
 func (iv Ivy) Execute(id string, ex string) (string, error) {
 	_, err := iv.execute(fmt.Sprintf("%s = %s", id, ex))
 	if err != nil {
+		iv.lastErr = err
 		return "", err
 	}
 
 	result, err := iv.execute(id)
 	if err != nil {
+		iv.lastErr = err
 		return "", err
 	}
 
 	return result, nil
+}
+
+func (iv *Ivy) SetBase(inputBase int, outputBase int) {
+	iv.inputBase = inputBase
+	iv.outputBase = outputBase
+
+	var err error
+
+	_, err = iv.execute(fmt.Sprintf(")ibase %d", iv.inputBase))
+	_, err = iv.execute(fmt.Sprintf(")obase %d", iv.outputBase))
+
+	if err != nil {
+		iv.lastErr = err
+		fmt.Println(err)
+	}
+}
+
+func (iv Ivy) Base() (int, int) {
+	return iv.inputBase, iv.outputBase
 }

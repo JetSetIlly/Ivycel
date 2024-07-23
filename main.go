@@ -127,6 +127,8 @@ func (iv *ivycel) layout() {
 		worksheet.Flags(giu.TableFlagsBorders | giu.TableFlagsScrollY | giu.TableFlagsScrollX)
 	}
 
+	inputBase, outputBase := iv.ivy.Base()
+
 	w.Layout(
 		giu.Style().SetFontSize(16).To(
 			giu.MenuBar().Layout(
@@ -138,17 +140,46 @@ func (iv *ivycel) layout() {
 						giu.MenuItem("CSV file"),
 					),
 				),
-				giu.Menu("Edit").Layout(
-					giu.MenuItem("<placeholder>"),
-				),
-				giu.Menu("View").Layout(
-					giu.MenuItem("<placeholder>"),
-				),
-				giu.Menu("Insert").Layout(
-					giu.MenuItem("<placeholder>"),
-				),
-				giu.Menu("Format").Layout(
-					giu.MenuItem("<placeholder>"),
+				giu.Menu("Base").Layout(
+					giu.Label("Input"),
+					giu.Spacing(),
+					giu.MenuItem("binary").Selected(inputBase == 2).OnClick(func() {
+						iv.ivy.SetBase(2, outputBase)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.MenuItem("octal").Selected(inputBase == 8).OnClick(func() {
+						iv.ivy.SetBase(8, outputBase)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.MenuItem("decimal").Selected(inputBase == 10).OnClick(func() {
+						iv.ivy.SetBase(10, outputBase)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.MenuItem("hexadecimal").Selected(inputBase == 16).OnClick(func() {
+						iv.ivy.SetBase(16, outputBase)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+					giu.Label("Output"),
+					giu.Spacing(),
+					giu.MenuItem("binary").Selected(outputBase == 2).OnClick(func() {
+						iv.ivy.SetBase(inputBase, 2)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.MenuItem("octal").Selected(outputBase == 8).OnClick(func() {
+						iv.ivy.SetBase(inputBase, 8)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.MenuItem("decimal").Selected(outputBase == 10).OnClick(func() {
+						iv.ivy.SetBase(inputBase, 10)
+						iv.worksheet.RecalculateAll()
+					}),
+					giu.MenuItem("hexadecimal").Selected(outputBase == 16).OnClick(func() {
+						iv.ivy.SetBase(inputBase, 16)
+						iv.worksheet.RecalculateAll()
+					}),
 				),
 			),
 		),

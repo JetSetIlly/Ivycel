@@ -18,13 +18,19 @@ type ivycel struct {
 }
 
 type worksheetUser struct {
-	selected     *cells.Cell
-	editing      *cells.Cell
+	selected *cells.Cell
+	editing  *cells.Cell
+
+	// focus either the cell-input or the formula-input on the next update
 	focusCell    bool
 	focusFormula bool
 }
 
 type cellUser struct {
+	// the edit cursor position is stored for each cell. however, because only
+	// one cell can be in the 'editing' mode at once, we can probably keep this
+	// value in the ivycel type. but this seems more correct
+	editCursorPosition int
 }
 
 func (iv *ivycel) layout() {
@@ -34,15 +40,17 @@ func (iv *ivycel) layout() {
 	selected = giu.Label(iv.worksheet.User.(*worksheetUser).selected.Position().Reference())
 
 	var formula *giu.InputTextWidget
-	formula = giu.InputText(&iv.worksheet.User.(*worksheetUser).selected.Entry)
-	formula.Flags(giu.InputTextFlagsEnterReturnsTrue)
-	formula.OnChange(func() {
-		iv.worksheet.User.(*worksheetUser).selected.Commit(true)
-		iv.worksheet.RecalculateAll()
-		iv.worksheet.User.(*worksheetUser).editing = nil
-		iv.worksheet.User.(*worksheetUser).focusFormula = true
-	})
-	formula.Size(-1)
+	{
+		formula = giu.InputText(&iv.worksheet.User.(*worksheetUser).selected.Entry)
+		formula.Flags(giu.InputTextFlagsEnterReturnsTrue)
+		formula.OnChange(func() {
+			iv.worksheet.User.(*worksheetUser).selected.Commit(true)
+			iv.worksheet.RecalculateAll()
+			iv.worksheet.User.(*worksheetUser).editing = nil
+			iv.worksheet.User.(*worksheetUser).focusFormula = true
+		})
+		formula.Size(-1)
+	}
 
 	var worksheet *giu.TableWidget
 	{
@@ -78,12 +86,26 @@ func (iv *ivycel) layout() {
 				if iv.worksheet.User.(*worksheetUser).editing == cell {
 					giu.SetKeyboardFocusHere()
 					inp := giu.InputText(&cell.Entry).Size(-1)
-					inp.Flags(giu.InputTextFlagsEnterReturnsTrue | giu.InputTextFlagsAutoSelectAll)
+
+					// CalbackAlways flag so we can update the editCursorPosition every keypress
+					// and EnterReturnsTrue so that OnChange() is not triggered until editing
+					// has finished
+					inp.Flags(giu.InputTextFlagsCallbackAlways | giu.InputTextFlagsEnterReturnsTrue)
+
+					// keep track of current cursor position in the input
+					// widget. we use this to insert cell references at the
+					// correct point
+					inp.Callback(func(data imgui.InputTextCallbackData) int {
+						cell.User.(*cellUser).editCursorPosition = int(data.CursorPos())
+						return 0
+					})
+
 					inp.OnChange(func() {
 						iv.worksheet.User.(*worksheetUser).editing = nil
 						cell.Commit(true)
 						iv.worksheet.RecalculateAll()
 					})
+
 					rowCols = append(rowCols,
 						giu.Row(
 							inp,
@@ -96,22 +118,28 @@ func (iv *ivycel) layout() {
 						),
 					)
 				} else {
-					p := giu.GetCursorScreenPos()
-					lab := giu.Label(cell.Result())
-					ev := giu.Event().OnClick(giu.MouseButtonLeft, func() {
-						iv.worksheet.User.(*worksheetUser).selected = cell
-					}).OnDClick(giu.MouseButtonLeft, func() {
-						if !cell.ReadOnly() {
-							iv.worksheet.User.(*worksheetUser).editing = cell
-							iv.worksheet.User.(*worksheetUser).focusCell = true
-						}
-					})
-					giu.SetCursorScreenPos(p)
+					// label and invisible button necessary to make as much of
+					// the cell area as clickable as possible
 
-					inv := giu.InvisibleButton().Size(-1, rowHeight)
-					ev2 := giu.Event().OnClick(giu.MouseButtonLeft, func() {
-						iv.worksheet.User.(*worksheetUser).selected = cell
-					}).OnDClick(giu.MouseButtonLeft, func() {
+					onClick := func() {
+						if iv.worksheet.User.(*worksheetUser).editing != nil {
+							// insert selected cell reference to cell being edited
+							editCell := iv.worksheet.User.(*worksheetUser).editing
+							pos := editCell.User.(*cellUser).editCursorPosition
+							editCell.Entry = fmt.Sprintf("%s%s%s",
+								editCell.Entry[:pos],
+								iv.ivy.WrapCellReference(cell.Position().Reference()),
+								editCell.Entry[pos:],
+							)
+
+							// cell being editing will need to be refocused after the user click
+							iv.worksheet.User.(*worksheetUser).focusCell = true
+						} else {
+							iv.worksheet.User.(*worksheetUser).selected = cell
+						}
+					}
+
+					onDClick := func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
 							iv.worksheet.User.(*worksheetUser).editing.Commit(true)
 							iv.worksheet.RecalculateAll()
@@ -120,8 +148,19 @@ func (iv *ivycel) layout() {
 							iv.worksheet.User.(*worksheetUser).editing = cell
 							iv.worksheet.User.(*worksheetUser).focusCell = true
 						}
-					})
-					rowCols = append(rowCols, giu.Row(lab, ev, inv, ev2))
+					}
+
+					p := giu.GetCursorScreenPos()
+					lab := giu.Label(cell.Result())
+					evLab := giu.Event().OnClick(giu.MouseButtonLeft, onClick)
+					evLab.OnDClick(giu.MouseButtonLeft, onDClick)
+
+					giu.SetCursorScreenPos(p)
+
+					inv := giu.InvisibleButton().Size(-1, rowHeight)
+					evInv := giu.Event().OnClick(giu.MouseButtonLeft, onClick)
+					evInv.OnDClick(giu.MouseButtonLeft, onDClick)
+					rowCols = append(rowCols, giu.Row(lab, evLab, inv, evInv))
 				}
 
 			}

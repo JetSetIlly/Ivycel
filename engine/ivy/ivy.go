@@ -73,16 +73,16 @@ func (iv *Ivy) execute(ex string) (string, error) {
 	return iv.lastResult.String(), nil
 }
 
-func (iv *Ivy) Execute(id string, ex string) (string, error) {
-	id = fmt.Sprintf("v%s", id)
+func (iv *Ivy) Execute(ref string, ex string) (string, error) {
+	ref = iv.WrapCellReference(ref)
 
-	_, err := iv.execute(fmt.Sprintf("%s = %s", id, ex))
+	_, err := iv.execute(fmt.Sprintf("%s = %s", ref, ex))
 	if err != nil {
 		iv.logError(err)
 		return "", err
 	}
 
-	result, err := iv.execute(id)
+	result, err := iv.execute(ref)
 	if err != nil {
 		iv.logError(err)
 		return "", err
@@ -108,4 +108,18 @@ func (iv *Ivy) SetBase(inputBase int, outputBase int) {
 
 func (iv Ivy) Base() (int, int) {
 	return iv.inputBase, iv.outputBase
+}
+
+// cell references are prefixed with this rune in order to prevent them looking
+// like hexadecimal numbers, which would be a problem in some contexts
+//
+// this is only required due to the current method of storing variables in ivy.
+// there may be a better solution and so might be removed in the future
+const cellReferencePrefix = 'v'
+
+// cell reference is converted so that it is safe to use with ivy in all
+// instances. it only needs to be called when the cell appears in a cell entry.
+// ie. something that will be evaluated by ivy
+func (iv Ivy) WrapCellReference(ref string) string {
+	return fmt.Sprintf("%c%s", cellReferencePrefix, ref)
 }

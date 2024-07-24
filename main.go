@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 
 	imgui "github.com/AllenDang/cimgui-go"
 	"github.com/AllenDang/giu"
@@ -11,8 +12,13 @@ import (
 )
 
 type ivycel struct {
-	ivy       ivy.Ivy
+	ivy ivy.Ivy
+
 	worksheet worksheet.Worksheet
+
+	cellNormal   *giu.StyleSetter
+	cellReadOnly *giu.StyleSetter
+	cellEdit     *giu.StyleSetter
 
 	statusBarHeight int
 }
@@ -31,6 +37,55 @@ type cellUser struct {
 	// one cell can be in the 'editing' mode at once, we can probably keep this
 	// value in the ivycel type. but this seems more correct
 	editCursorPosition int
+}
+
+// the window menu is complicated enough to warrant its own function
+func (iv *ivycel) layoutMenu() giu.Widget {
+	inputBase, outputBase := iv.ivy.Base()
+
+	inputBaseMenuItem := func(label string, base int) giu.Widget {
+		return giu.MenuItem(label).Selected(inputBase == base).OnClick(func() {
+			iv.ivy.SetBase(base, outputBase)
+			iv.worksheet.RecalculateAll()
+		})
+	}
+
+	outputBaseMenuItem := func(label string, base int) giu.Widget {
+		return giu.MenuItem(label).Selected(outputBase == base).OnClick(func() {
+			iv.ivy.SetBase(inputBase, base)
+			iv.worksheet.RecalculateAll()
+		})
+	}
+
+	return giu.Style().SetFontSize(16.5).To(
+		giu.MenuBar().Layout(
+			giu.Menu("File").Layout(
+				giu.MenuItem("Open").Shortcut("Ctrl+O"),
+				giu.MenuItem("Save"),
+				giu.Menu("Save as ...").Layout(
+					giu.MenuItem("Excel file"),
+					giu.MenuItem("CSV file"),
+				),
+			),
+			giu.Menu("Base").Layout(
+				giu.Label("Input"),
+				giu.Spacing(),
+				inputBaseMenuItem("Binary", 2),
+				inputBaseMenuItem("Octal", 8),
+				inputBaseMenuItem("Decimal", 10),
+				inputBaseMenuItem("Hexadecimal", 16),
+				giu.Spacing(),
+				giu.Separator(),
+				giu.Spacing(),
+				giu.Label("Output"),
+				giu.Spacing(),
+				outputBaseMenuItem("Binary", 2),
+				outputBaseMenuItem("Octal", 8),
+				outputBaseMenuItem("Decimal", 10),
+				outputBaseMenuItem("Hexadecimal", 16),
+			),
+		),
+	)
 }
 
 func (iv *ivycel) layout() {
@@ -52,16 +107,23 @@ func (iv *ivycel) layout() {
 		formula.Size(-1)
 	}
 
+	// the main body of the spreadsheet is a table
 	var worksheet *giu.TableWidget
 	{
-		worksheet = giu.Table()
-		worksheet.Size(-1, -1-float32(iv.statusBarHeight))
+		var cols []*giu.TableColumnWidget
+		var rows []*giu.TableRowWidget
 
 		rowCt, colCt := iv.worksheet.Size()
 
-		var cols []*giu.TableColumnWidget
-		c := giu.TableColumn("")
-		cols = append(cols, c)
+		worksheet = giu.Table()
+		worksheet.Size(-1, -1-float32(iv.statusBarHeight))
+		worksheet.Freeze(1, 1)
+		worksheet.Flags(giu.TableFlagsScrollY | giu.TableFlagsScrollX | giu.TableFlagsResizable)
+
+		// first column is the row number and should not be resizeable
+		cols = append(cols, giu.TableColumn("").Flags(giu.TableColumnFlagsNoResize))
+
+		// remaining columns are worksheet columns numbered from "A"
 		for i := range colCt {
 			c := giu.TableColumn(cells.NumericToBase26(i))
 			c.Flags(giu.TableColumnFlagsWidthFixed)
@@ -69,20 +131,26 @@ func (iv *ivycel) layout() {
 			cols = append(cols, c)
 		}
 
-		var rowHeight float32
-		{
-			rowHeight = imgui.CalcTextSize("X").Y
-			_, y := giu.GetItemInnerSpacing()
-			rowHeight += y * 2
-		}
+		// height of each row
+		rowHeight := imgui.CalcTextSize("X").Y
+		_, y := giu.GetItemInnerSpacing()
+		rowHeight += y * 2
 
-		var rows []*giu.TableRowWidget
 		for i := range rowCt {
 			var rowCols []giu.Widget
-			rowCols = append(rowCols, giu.Label(fmt.Sprintf("%d", i+1)))
+
+			// first column of each row is the row number
+			rowCols = append(rowCols, giu.Custom(func() {
+				giu.AlignTextToFramePadding()
+				giu.Label(fmt.Sprintf(" %d", i+1)).Build()
+			}))
+
 			for j := range colCt {
+				// reference to the cell at row/column number
 				cell := iv.worksheet.CellEntry(i, j)
 
+				// how we display the cell depends on whether the cell is the
+				// one currently being edited
 				if iv.worksheet.User.(*worksheetUser).editing == cell {
 					giu.SetKeyboardFocusHere()
 					inp := giu.InputText(&cell.Entry).Size(-1)
@@ -107,21 +175,40 @@ func (iv *ivycel) layout() {
 					})
 
 					rowCols = append(rowCols,
-						giu.Row(
-							inp,
-							giu.Custom(func() {
-								if iv.worksheet.User.(*worksheetUser).focusCell {
-									iv.worksheet.User.(*worksheetUser).focusCell = false
-									giu.SetKeyboardFocusHereV(-1)
-								}
-							}),
-						),
+						giu.Custom(func() {
+							iv.cellEdit.Push()
+							defer iv.cellEdit.Pop()
+							inp.Build()
+							if iv.worksheet.User.(*worksheetUser).focusCell {
+								iv.worksheet.User.(*worksheetUser).focusCell = false
+								giu.SetKeyboardFocusHereV(-1)
+							}
+						}),
 					)
 				} else {
-					// label and invisible button necessary to make as much of
-					// the cell area as clickable as possible
+					// each cell is a button with a tooltip. the tooltip can be
+					// an empty widget meaning that it will never appear
+					var cel *giu.ButtonWidget
+					var tip giu.Widget
 
-					onClick := func() {
+					if err := cell.Error(); err != nil {
+						cel = giu.Button("???")
+						tip = giu.Tooltip(err.Error())
+					} else {
+						cel = giu.Button(cell.Result())
+						tip = giu.Custom(func() {})
+					}
+
+					// each cell is the width of the column it is in and the
+					// height of the row
+					cel.Size(-1, rowHeight)
+
+					// event handler for cell deals with mouse clicks. we prefer
+					// this to the Button.OnClick() functio
+					var ev *giu.EventHandler
+					ev = giu.Event()
+
+					ev.OnClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
 							// insert selected cell reference to cell being edited
 							editCell := iv.worksheet.User.(*worksheetUser).editing
@@ -137,9 +224,9 @@ func (iv *ivycel) layout() {
 						} else {
 							iv.worksheet.User.(*worksheetUser).selected = cell
 						}
-					}
+					})
 
-					onDClick := func() {
+					ev.OnDClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
 							iv.worksheet.User.(*worksheetUser).editing.Commit(true)
 							iv.worksheet.RecalculateAll()
@@ -148,28 +235,25 @@ func (iv *ivycel) layout() {
 							iv.worksheet.User.(*worksheetUser).editing = cell
 							iv.worksheet.User.(*worksheetUser).focusCell = true
 						}
-					}
+					})
 
-					var tooltip giu.Widget
-					tooltip = giu.Custom(func() {})
-
-					p := giu.GetCursorScreenPos()
-					var lab *giu.LabelWidget
-					if err := cell.Error(); err != nil {
-						lab = giu.Label("???")
-						tooltip = giu.Tooltip(err.Error())
+					// decide on display style for cell
+					var sty *giu.StyleSetter
+					if cell.ReadOnly() {
+						sty = iv.cellReadOnly
 					} else {
-						lab = giu.Label(cell.Result())
+						sty = iv.cellNormal
+
 					}
-					evLab := giu.Event().OnClick(giu.MouseButtonLeft, onClick)
-					evLab.OnDClick(giu.MouseButtonLeft, onDClick)
 
-					giu.SetCursorScreenPos(p)
-
-					inv := giu.InvisibleButton().Size(-1, rowHeight)
-					evInv := giu.Event().OnClick(giu.MouseButtonLeft, onClick)
-					evInv.OnDClick(giu.MouseButtonLeft, onDClick)
-					rowCols = append(rowCols, giu.Row(lab, evLab, tooltip, inv, evInv, tooltip))
+					rowCols = append(rowCols,
+						giu.Custom(func() {
+							sty.Push()
+							defer sty.Pop()
+							cel.Build()
+							ev.Build()
+							tip.Build()
+						}))
 				}
 
 			}
@@ -178,10 +262,10 @@ func (iv *ivycel) layout() {
 
 		worksheet.Columns(cols...)
 		worksheet.Rows(rows...)
-		worksheet.Freeze(1, 1)
-		worksheet.Flags(giu.TableFlagsBorders | giu.TableFlagsScrollY | giu.TableFlagsScrollX)
 	}
 
+	// the status bar appears at the bottom of the window. the height of the
+	// status bar is measured during the layout directive below
 	var statusBar *giu.LabelWidget
 	{
 		lastErr := iv.ivy.LastError()
@@ -192,62 +276,8 @@ func (iv *ivycel) layout() {
 		}
 	}
 
-	inputBase, outputBase := iv.ivy.Base()
-
 	w.Layout(
-		giu.Style().SetFontSize(16).To(
-			giu.MenuBar().Layout(
-				giu.Menu("File").Layout(
-					giu.MenuItem("Open").Shortcut("Ctrl+O"),
-					giu.MenuItem("Save"),
-					giu.Menu("Save as ...").Layout(
-						giu.MenuItem("Excel file"),
-						giu.MenuItem("CSV file"),
-					),
-				),
-				giu.Menu("Base").Layout(
-					giu.Label("Input"),
-					giu.Spacing(),
-					giu.MenuItem("binary").Selected(inputBase == 2).OnClick(func() {
-						iv.ivy.SetBase(2, outputBase)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.MenuItem("octal").Selected(inputBase == 8).OnClick(func() {
-						iv.ivy.SetBase(8, outputBase)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.MenuItem("decimal").Selected(inputBase == 10).OnClick(func() {
-						iv.ivy.SetBase(10, outputBase)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.MenuItem("hexadecimal").Selected(inputBase == 16).OnClick(func() {
-						iv.ivy.SetBase(16, outputBase)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.Spacing(),
-					giu.Separator(),
-					giu.Spacing(),
-					giu.Label("Output"),
-					giu.Spacing(),
-					giu.MenuItem("binary").Selected(outputBase == 2).OnClick(func() {
-						iv.ivy.SetBase(inputBase, 2)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.MenuItem("octal").Selected(outputBase == 8).OnClick(func() {
-						iv.ivy.SetBase(inputBase, 8)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.MenuItem("decimal").Selected(outputBase == 10).OnClick(func() {
-						iv.ivy.SetBase(inputBase, 10)
-						iv.worksheet.RecalculateAll()
-					}),
-					giu.MenuItem("hexadecimal").Selected(outputBase == 16).OnClick(func() {
-						iv.ivy.SetBase(inputBase, 16)
-						iv.worksheet.RecalculateAll()
-					}),
-				),
-			),
-		),
+		iv.layoutMenu(),
 		giu.Style().SetFontSize(18).To(
 			giu.Row(
 				selected,
@@ -280,6 +310,25 @@ func (iv *ivycel) layout() {
 	)
 }
 
+func (iv *ivycel) setStyling() {
+	iv.cellNormal = giu.Style().
+		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
+		SetStyleFloat(giu.StyleVarFrameRounding, 0).
+		SetStyle(giu.StyleVarButtonTextAlign, 0, 0).
+		SetColor(giu.StyleColorText, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+
+	iv.cellReadOnly = giu.Style().
+		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
+		SetStyleFloat(giu.StyleVarFrameRounding, 0).
+		SetStyle(giu.StyleVarButtonTextAlign, 0, 0).
+		SetColor(giu.StyleColorButton, color.Transparent)
+
+	iv.cellEdit = giu.Style().
+		SetStyleFloat(giu.StyleVarFrameBorderSize, 2).
+		SetStyleFloat(giu.StyleVarFrameRounding, 3).
+		SetColor(giu.StyleColorBorder, color.RGBA{R: 100, G: 100, B: 200, A: 255})
+}
+
 func main() {
 	iv := ivycel{
 		ivy: ivy.New(),
@@ -299,5 +348,6 @@ func main() {
 	}
 
 	wnd := giu.NewMasterWindow("Ivycel", 800, 600, giu.MasterWindowFlagsNotResizable)
+	iv.setStyling()
 	wnd.Run(iv.layout)
 }

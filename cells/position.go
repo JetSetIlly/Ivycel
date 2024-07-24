@@ -37,7 +37,7 @@ func (p Position) Reference() string {
 	if p.IsError() {
 		return ""
 	}
-	return fmt.Sprintf("%s%d", NumericToBase26(p.Column), p.Row)
+	return fmt.Sprintf("%s%d", NumericToBase26(p.Column), p.Row+1)
 }
 
 var IllegalReference = errors.New("illegal position reference")
@@ -70,6 +70,12 @@ func PositionFromReference(ref string) (Position, error) {
 	if err != nil {
 		return errorPosition, fmt.Errorf("%w: malformed row number", IllegalReference)
 	}
+
+	// internally we count count rows from zero but externally they are counted from one
+	if row == 0 {
+		return errorPosition, fmt.Errorf("%w: row numbers start from one", IllegalReference)
+	}
+	row--
 
 	return Position{Column: col, Row: row}, nil
 }

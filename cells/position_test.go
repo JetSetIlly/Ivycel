@@ -24,22 +24,22 @@ func ExpectedError(t *testing.T, err error, expected error) {
 func TestPositionReference(t *testing.T) {
 	var p cells.Position
 
-	ExpectEquality(t, p.String(), "A0")
+	ExpectEquality(t, p.String(), "A1")
 	p.Column = 1
-	ExpectEquality(t, p.String(), "B0")
+	ExpectEquality(t, p.String(), "B1")
 	p.Column = 2
-	ExpectEquality(t, p.String(), "C0")
+	ExpectEquality(t, p.String(), "C1")
 	p.Column = 23
-	ExpectEquality(t, p.String(), "X0")
+	ExpectEquality(t, p.String(), "X1")
 	p.Column = 24
-	ExpectEquality(t, p.String(), "Y0")
+	ExpectEquality(t, p.String(), "Y1")
 	p.Column = 25
-	ExpectEquality(t, p.String(), "Z0")
+	ExpectEquality(t, p.String(), "Z1")
 
 	p.Column = 26
-	ExpectEquality(t, p.String(), "AA0")
+	ExpectEquality(t, p.String(), "AA1")
 	p.Column = 52
-	ExpectEquality(t, p.String(), "BA0")
+	ExpectEquality(t, p.String(), "BA1")
 }
 
 func TestPositionFromReference(t *testing.T) {
@@ -49,8 +49,8 @@ func TestPositionFromReference(t *testing.T) {
 		normalised string
 	}
 	tests := []testSpec{
-		{ref: "A0", err: nil},
-		{ref: "B0", err: nil},
+		{ref: "A1", err: nil},
+		{ref: "B1", err: nil},
 		{ref: "A99", err: nil},
 		{ref: "Z99", err: nil},
 		{ref: "AA99", err: nil},
@@ -59,6 +59,7 @@ func TestPositionFromReference(t *testing.T) {
 		{ref: "QUX100", err: nil},
 
 		// illegal references
+		{ref: "A0", err: cells.IllegalReference},
 		{ref: "00", err: cells.IllegalReference},
 		{ref: "ZZ", err: cells.IllegalReference},
 		{ref: "A0Z", err: cells.IllegalReference},
@@ -67,7 +68,7 @@ func TestPositionFromReference(t *testing.T) {
 		{ref: "A01", err: nil, normalised: "A1"},
 		{ref: "a1", err: nil, normalised: "A1"},
 		{ref: "bA498", err: nil, normalised: "BA498"},
-		{ref: " A0", err: nil, normalised: "A0"},
+		{ref: " A1", err: nil, normalised: "A1"},
 		{ref: "A99 ", err: nil, normalised: "A99"},
 	}
 

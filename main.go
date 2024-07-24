@@ -79,7 +79,7 @@ func (iv *ivycel) layout() {
 		var rows []*giu.TableRowWidget
 		for i := range rowCt {
 			var rowCols []giu.Widget
-			rowCols = append(rowCols, giu.Label(fmt.Sprintf("%d", i)))
+			rowCols = append(rowCols, giu.Label(fmt.Sprintf("%d", i+1)))
 			for j := range colCt {
 				cell := iv.worksheet.CellEntry(i, j)
 

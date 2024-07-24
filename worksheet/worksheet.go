@@ -38,11 +38,13 @@ func (ws Worksheet) Size() (int, int) {
 }
 
 func (ws Worksheet) RecalculateAll() {
-	for i := 0; i < len(ws.cells); i++ {
-		for j := 0; j < len(ws.cells[i]); j++ {
-			ws.cells[i][j].Commit(false)
+	ws.engine.WithErrorSupression(func() {
+		for i := 0; i < len(ws.cells); i++ {
+			for j := 0; j < len(ws.cells[i]); j++ {
+				ws.cells[i][j].Commit(false)
+			}
 		}
-	}
+	})
 }
 
 func (ws Worksheet) RelativeCell(root *cells.Cell, pos cells.Position) *cells.Cell {

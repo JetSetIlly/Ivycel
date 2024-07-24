@@ -28,7 +28,8 @@ type Ivy struct {
 	inputBase  int
 	outputBase int
 
-	lastErr error
+	errorSuppression bool
+	lastErr          error
 }
 
 func New() Ivy {
@@ -50,17 +51,29 @@ func New() Ivy {
 func (iv *Ivy) logError(err error) error {
 	spl := strings.SplitN(err.Error(), ":", 3)
 	if len(spl) > 0 {
-		iv.lastErr = errors.New(spl[len(spl)-1])
+		err = errors.New(spl[len(spl)-1])
 	}
-	return iv.lastErr
+	if !iv.errorSuppression {
+		iv.lastErr = err
+	}
+	return err
 }
 
 func (iv Ivy) LastError() error {
 	return iv.lastErr
 }
 
+// run the supplied function but with the error suppression flag set
+func (iv *Ivy) WithErrorSupression(with func()) {
+	iv.errorSuppression = true
+	with()
+	iv.errorSuppression = false
+}
+
 func (iv *Ivy) execute(ex string) (string, error) {
-	iv.lastErr = nil
+	if !iv.errorSuppression {
+		iv.lastErr = nil
+	}
 
 	iv.lastResult.Reset()
 	iv.lastError.Reset()

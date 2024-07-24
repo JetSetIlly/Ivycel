@@ -76,26 +76,30 @@ func (c *Cell) Commit(force bool) {
 	rowSplit := strings.Split(r, "\n")
 	for ri, rv := range rowSplit {
 		colSplit := strings.Fields(rv)
-
-		var from int
-		if ri == 0 {
-			c.result = colSplit[0]
+		if len(colSplit) == 0 {
+			c.result = rv
 			c.parent = nil
-			from = 1
-		}
+		} else {
+			var from int
+			if ri == 0 {
+				c.result = colSplit[0]
+				c.parent = nil
+				from = 1
+			}
 
-		if from < len(colSplit) {
-			for ci, cv := range colSplit[from:] {
-				rel := c.worksheet.RelativeCell(c, Position{Row: ri, Column: ci + from})
-				if rel == nil {
-					break
+			if from < len(colSplit) {
+				for ci, cv := range colSplit[from:] {
+					rel := c.worksheet.RelativeCell(c, Position{Row: ri, Column: ci + from})
+					if rel == nil {
+						break
+					}
+
+					c.children = append(c.children, rel)
+
+					rel.Entry = strings.TrimSpace(cv)
+					rel.parent = c
+					rel.result, rel.err = c.engine.Execute(rel.position.Reference(), rel.Entry)
 				}
-
-				c.children = append(c.children, rel)
-
-				rel.Entry = strings.TrimSpace(cv)
-				rel.parent = c
-				rel.result, rel.err = c.engine.Execute(rel.position.Reference(), rel.Entry)
 			}
 		}
 	}

@@ -37,7 +37,7 @@ func (iv *ivycel) layout() {
 	formula = giu.InputText(&iv.worksheet.User.(*worksheetUser).selected.Entry)
 	formula.Flags(giu.InputTextFlagsEnterReturnsTrue)
 	formula.OnChange(func() {
-		iv.worksheet.User.(*worksheetUser).selected.Commit()
+		iv.worksheet.User.(*worksheetUser).selected.Commit(true)
 		iv.worksheet.RecalculateAll()
 		iv.worksheet.User.(*worksheetUser).editing = nil
 		iv.worksheet.User.(*worksheetUser).focusFormula = true
@@ -81,7 +81,7 @@ func (iv *ivycel) layout() {
 					inp.Flags(giu.InputTextFlagsEnterReturnsTrue | giu.InputTextFlagsAutoSelectAll)
 					inp.OnChange(func() {
 						iv.worksheet.User.(*worksheetUser).editing = nil
-						cell.Commit()
+						cell.Commit(true)
 						iv.worksheet.RecalculateAll()
 					})
 					rowCols = append(rowCols,
@@ -101,8 +101,10 @@ func (iv *ivycel) layout() {
 					ev := giu.Event().OnClick(giu.MouseButtonLeft, func() {
 						iv.worksheet.User.(*worksheetUser).selected = cell
 					}).OnDClick(giu.MouseButtonLeft, func() {
-						iv.worksheet.User.(*worksheetUser).editing = cell
-						iv.worksheet.User.(*worksheetUser).focusCell = true
+						if !cell.ReadOnly() {
+							iv.worksheet.User.(*worksheetUser).editing = cell
+							iv.worksheet.User.(*worksheetUser).focusCell = true
+						}
 					})
 					giu.SetCursorScreenPos(p)
 
@@ -111,11 +113,13 @@ func (iv *ivycel) layout() {
 						iv.worksheet.User.(*worksheetUser).selected = cell
 					}).OnDClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
-							iv.worksheet.User.(*worksheetUser).editing.Commit()
+							iv.worksheet.User.(*worksheetUser).editing.Commit(true)
 							iv.worksheet.RecalculateAll()
 						}
-						iv.worksheet.User.(*worksheetUser).editing = cell
-						iv.worksheet.User.(*worksheetUser).focusCell = true
+						if !cell.ReadOnly() {
+							iv.worksheet.User.(*worksheetUser).editing = cell
+							iv.worksheet.User.(*worksheetUser).focusCell = true
+						}
 					})
 					rowCols = append(rowCols, giu.Row(lab, ev, inv, ev2))
 				}
@@ -205,7 +209,13 @@ func (iv *ivycel) layout() {
 						iv.worksheet.User.(*worksheetUser).focusFormula = false
 					}
 				}),
-				formula,
+				giu.Custom(func() {
+					if iv.worksheet.User.(*worksheetUser).selected.ReadOnly() {
+						giu.Style().SetDisabled(true).Push()
+						defer giu.Style().SetDisabled(true).Pop()
+					}
+					formula.Build()
+				}),
 			),
 			worksheet,
 		),

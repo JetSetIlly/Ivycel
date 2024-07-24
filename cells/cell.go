@@ -19,6 +19,9 @@ type Cell struct {
 	result string
 	err    error
 
+	parent   *Cell
+	children []*Cell
+
 	User any
 }
 
@@ -34,18 +37,40 @@ func (c Cell) Position() Position {
 	return c.position
 }
 
-func (c *Cell) Commit() {
-	c.Entry = strings.TrimSpace(c.Entry)
-	if c.Entry == "" {
-		c.result = ""
-		c.err = nil
+// force argument will commit the cell even if the cell is read-only. this is
+// normally what you would want unless you were re-committing as part of a
+// recalculation
+func (c *Cell) Commit(force bool) {
+	if c.ReadOnly() && !force {
 		return
 	}
+
+	// clear previous results from child cells
+	for _, child := range c.children {
+		child.Entry = ""
+		child.Commit(true)
+	}
+
+	// if entry is empty then we don't need to do any more except tidy up
+	c.Entry = strings.TrimSpace(c.Entry)
+	if c.Entry == "" {
+		_, _ = c.engine.Execute(c.position.Reference(), "0")
+		c.result = ""
+		c.err = nil
+		c.parent = nil
+		return
+	}
+
+	// execute contents of cell
 	r, err := c.engine.Execute(c.position.Reference(), c.Entry)
 	if err != nil {
 		c.err = err
 		return
 	}
+
+	inputBase, outputBase := c.engine.Base()
+	c.engine.SetBase(outputBase, outputBase)
+	defer c.engine.SetBase(inputBase, outputBase)
 
 	r = strings.TrimSpace(r)
 	rowSplit := strings.Split(r, "\n")
@@ -55,6 +80,7 @@ func (c *Cell) Commit() {
 		var from int
 		if ri == 0 {
 			c.result = colSplit[0]
+			c.parent = nil
 			from = 1
 		}
 
@@ -64,8 +90,12 @@ func (c *Cell) Commit() {
 				if rel == nil {
 					break
 				}
+
+				c.children = append(c.children, rel)
+
 				rel.Entry = strings.TrimSpace(cv)
-				rel.Commit()
+				rel.parent = c
+				rel.result, rel.err = c.engine.Execute(rel.position.Reference(), rel.Entry)
 			}
 		}
 	}
@@ -73,4 +103,8 @@ func (c *Cell) Commit() {
 
 func (c *Cell) Result() string {
 	return c.result
+}
+
+func (c *Cell) ReadOnly() bool {
+	return c.parent != nil
 }

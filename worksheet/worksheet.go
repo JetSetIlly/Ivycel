@@ -40,7 +40,7 @@ func (ws Worksheet) Size() (int, int) {
 func (ws Worksheet) RecalculateAll() {
 	for i := 0; i < len(ws.cells); i++ {
 		for j := 0; j < len(ws.cells[i]); j++ {
-			ws.cells[i][j].Commit()
+			ws.cells[i][j].Commit(false)
 		}
 	}
 }

@@ -39,7 +39,8 @@ func (c Cell) Position() Position {
 
 // force argument will commit the cell even if the cell is read-only. this is
 // normally what you would want unless you were re-committing as part of a
-// recalculation
+// recalculation. it also causes the engine to execute a zero assignment for the
+// cell in the event of the Entry field being empty
 func (c *Cell) Commit(force bool) {
 	if c.ReadOnly() && !force {
 		return
@@ -54,9 +55,11 @@ func (c *Cell) Commit(force bool) {
 	// if entry is empty then we don't need to do any more except tidy up
 	c.Entry = strings.TrimSpace(c.Entry)
 	if c.Entry == "" {
-		_, _ = c.engine.Execute(c.position.Reference(), "0")
-		c.result = ""
+		if force {
+			_, _ = c.engine.Execute(c.position.Reference(), "0")
+		}
 		c.err = nil
+		c.result = ""
 		c.parent = nil
 		return
 	}
@@ -67,6 +70,9 @@ func (c *Cell) Commit(force bool) {
 		c.err = err
 		return
 	}
+
+	// engine executed successfully
+	c.err = nil
 
 	inputBase, outputBase := c.engine.Base()
 	c.engine.SetBase(outputBase, outputBase)

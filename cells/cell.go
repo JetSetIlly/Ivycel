@@ -109,6 +109,10 @@ func (c *Cell) Result() string {
 	return c.result
 }
 
+func (c *Cell) Error() error {
+	return c.err
+}
+
 func (c *Cell) ReadOnly() bool {
 	return c.parent != nil
 }

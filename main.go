@@ -150,8 +150,17 @@ func (iv *ivycel) layout() {
 						}
 					}
 
+					var tooltip giu.Widget
+					tooltip = giu.Custom(func() {})
+
 					p := giu.GetCursorScreenPos()
-					lab := giu.Label(cell.Result())
+					var lab *giu.LabelWidget
+					if err := cell.Error(); err != nil {
+						lab = giu.Label("???")
+						tooltip = giu.Tooltip(err.Error())
+					} else {
+						lab = giu.Label(cell.Result())
+					}
 					evLab := giu.Event().OnClick(giu.MouseButtonLeft, onClick)
 					evLab.OnDClick(giu.MouseButtonLeft, onDClick)
 
@@ -160,7 +169,7 @@ func (iv *ivycel) layout() {
 					inv := giu.InvisibleButton().Size(-1, rowHeight)
 					evInv := giu.Event().OnClick(giu.MouseButtonLeft, onClick)
 					evInv.OnDClick(giu.MouseButtonLeft, onDClick)
-					rowCols = append(rowCols, giu.Row(lab, evLab, inv, evInv))
+					rowCols = append(rowCols, giu.Row(lab, evLab, tooltip, inv, evInv, tooltip))
 				}
 
 			}

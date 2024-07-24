@@ -45,11 +45,14 @@ func New() Ivy {
 	return iv
 }
 
-func (iv *Ivy) logError(err error) {
+// log error normalises the error message and assigns it to the lastErr field.
+// it also returns the lastErr field (ie. the normalised form)
+func (iv *Ivy) logError(err error) error {
 	spl := strings.SplitN(err.Error(), ":", 3)
 	if len(spl) > 0 {
 		iv.lastErr = errors.New(spl[len(spl)-1])
 	}
+	return iv.lastErr
 }
 
 func (iv Ivy) LastError() error {
@@ -78,14 +81,12 @@ func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 
 	_, err := iv.execute(fmt.Sprintf("%s = %s", ref, ex))
 	if err != nil {
-		iv.logError(err)
-		return "", err
+		return "", iv.logError(err)
 	}
 
 	result, err := iv.execute(ref)
 	if err != nil {
-		iv.logError(err)
-		return "", err
+		return "", iv.logError(err)
 	}
 
 	return result, nil

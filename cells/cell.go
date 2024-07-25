@@ -15,7 +15,8 @@ type Cell struct {
 	worksheet Worksheet
 	position  Position
 
-	Entry  string
+	Entry string
+
 	result string
 	err    error
 
@@ -51,6 +52,12 @@ func (c *Cell) Commit(force bool) {
 		child.Entry = ""
 		child.Commit(true)
 	}
+	c.children = c.children[:0]
+
+	// reset other fields
+	c.err = nil
+	c.result = ""
+	c.parent = nil
 
 	// if entry is empty then we don't need to do any more except tidy up
 	c.Entry = strings.TrimSpace(c.Entry)
@@ -58,9 +65,6 @@ func (c *Cell) Commit(force bool) {
 		if force {
 			_, _ = c.engine.Execute(c.position.Reference(), "0")
 		}
-		c.err = nil
-		c.result = ""
-		c.parent = nil
 		return
 	}
 
@@ -70,9 +74,6 @@ func (c *Cell) Commit(force bool) {
 		c.err = err
 		return
 	}
-
-	// engine executed successfully
-	c.err = nil
 
 	inputBase, outputBase := c.engine.Base()
 	c.engine.SetBase(outputBase, outputBase)

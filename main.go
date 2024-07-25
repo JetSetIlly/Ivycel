@@ -35,7 +35,7 @@ type worksheetUser struct {
 	selected *cells.Cell
 	editing  *cells.Cell
 
-	// focus either the cell-input or the formula-input on the next update
+	// focus either the cell being edited or the formula bar on the next update
 	focusCell    bool
 	focusFormula bool
 }
@@ -178,6 +178,11 @@ func (iv *ivycel) layout() {
 					// widget. we use this to insert cell references at the
 					// correct point
 					inp.Callback(func(data imgui.InputTextCallbackData) int {
+						if iv.worksheet.User.(*worksheetUser).focusCell {
+							iv.worksheet.User.(*worksheetUser).focusCell = false
+							data.SetCursorPos(int32(cell.User.(*cellUser).editCursorPosition))
+							data.ClearSelection()
+						}
 						cell.User.(*cellUser).editCursorPosition = int(data.CursorPos())
 						return 0
 					})
@@ -194,11 +199,15 @@ func (iv *ivycel) layout() {
 						giu.Custom(func() {
 							iv.cellEdit.Push()
 							defer iv.cellEdit.Pop()
-							inp.Build()
 							if iv.worksheet.User.(*worksheetUser).focusCell {
-								iv.worksheet.User.(*worksheetUser).focusCell = false
-								giu.SetKeyboardFocusHereV(-1)
+								// focusCell flag will be reset in the input widget's callback
+								// function above. we do this because setting the keyboard focus
+								// selects the entire contents of the input and we don't want that.
+								// delaying the flag reset allows us to clear the selection and move
+								// the input cursor
+								giu.SetKeyboardFocusHere()
 							}
+							inp.Build()
 						}),
 					)
 				} else {
@@ -224,35 +233,31 @@ func (iv *ivycel) layout() {
 					var ev *giu.EventHandler
 					ev = giu.Event()
 
-					ev.OnHover(func() {
-						if iv.worksheet.User.(*worksheetUser).editing != nil {
-						}
-					})
-
 					ev.OnClick(giu.MouseButtonLeft, func() {
-						if iv.worksheet.User.(*worksheetUser).editing != nil {
-							// insert selected cell reference to cell being edited
-							editCell := iv.worksheet.User.(*worksheetUser).editing
-							pos := editCell.User.(*cellUser).editCursorPosition
-							editCell.Entry = fmt.Sprintf("%s%s%s",
-								editCell.Entry[:pos],
-								iv.ivy.WrapCellReference(cell.Position().Reference()),
-								editCell.Entry[pos:],
-							)
-
-							// cell being editing will need to be refocused after the user click
-							iv.worksheet.User.(*worksheetUser).focusCell = true
-						} else {
+						if iv.worksheet.User.(*worksheetUser).editing == nil {
 							iv.worksheet.User.(*worksheetUser).selected = cell
 						}
 					})
 
 					ev.OnDClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
-							iv.worksheet.User.(*worksheetUser).editing.Commit(true)
-							iv.worksheet.RecalculateAll()
-						}
-						if !cell.ReadOnly() {
+							// insert selected cell reference to cell being edited
+							editCell := iv.worksheet.User.(*worksheetUser).editing
+							pos := editCell.User.(*cellUser).editCursorPosition
+							ref := iv.ivy.WrapCellReference(cell.Position().Reference())
+
+							editCell.Entry = fmt.Sprintf("%s%s%s",
+								editCell.Entry[:pos],
+								ref,
+								editCell.Entry[pos:],
+							)
+
+							// advance cursor position of edit cell
+							editCell.User.(*cellUser).editCursorPosition += len(ref)
+
+							// cell being editing will need to be refocused after double-click
+							iv.worksheet.User.(*worksheetUser).focusCell = true
+						} else if !cell.ReadOnly() {
 							iv.worksheet.User.(*worksheetUser).editing = cell
 							iv.worksheet.User.(*worksheetUser).focusCell = true
 						}

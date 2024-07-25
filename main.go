@@ -155,6 +155,12 @@ func (iv *ivycel) layout() {
 					giu.SetKeyboardFocusHere()
 					inp := giu.InputText(&cell.Entry).Size(-1)
 
+					// escape key cancels changes and deactivates the input text
+					// for the cell
+					if giu.IsKeyPressed(giu.KeyEscape) {
+						iv.worksheet.User.(*worksheetUser).editing = nil
+					}
+
 					// CalbackAlways flag so we can update the editCursorPosition every keypress
 					// and EnterReturnsTrue so that OnChange() is not triggered until editing
 					// has finished
@@ -168,6 +174,8 @@ func (iv *ivycel) layout() {
 						return 0
 					})
 
+					// on change function is only called on "enter returns true"
+					// commit changes
 					inp.OnChange(func() {
 						iv.worksheet.User.(*worksheetUser).editing = nil
 						cell.Commit(true)
@@ -348,6 +356,7 @@ func main() {
 	}
 
 	wnd := giu.NewMasterWindow("Ivycel", 800, 600, giu.MasterWindowFlagsNotResizable)
+
 	iv.setStyling()
 	wnd.Run(iv.layout)
 }

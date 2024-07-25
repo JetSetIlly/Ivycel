@@ -8,6 +8,7 @@ import (
 	"github.com/AllenDang/giu"
 	"github.com/jetsetilly/ivycel/cells"
 	"github.com/jetsetilly/ivycel/engine/ivy"
+	"github.com/jetsetilly/ivycel/fonts"
 	"github.com/jetsetilly/ivycel/worksheet"
 )
 
@@ -21,7 +22,14 @@ type ivycel struct {
 	cellEdit     *giu.StyleSetter
 
 	statusBarHeight int
+
+	font *giu.FontInfo
 }
+
+const (
+	normalFontSize    = 16.5
+	worksheetFontSize = 18
+)
 
 type worksheetUser struct {
 	selected *cells.Cell
@@ -57,7 +65,7 @@ func (iv *ivycel) layoutMenu() giu.Widget {
 		})
 	}
 
-	return giu.Style().SetFontSize(16.5).To(
+	return giu.Style().SetFont(iv.font).SetFontSize(16.5).To(
 		giu.MenuBar().Layout(
 			giu.Menu("File").Layout(
 				giu.MenuItem("Open").Shortcut("Ctrl+O"),
@@ -216,6 +224,11 @@ func (iv *ivycel) layout() {
 					var ev *giu.EventHandler
 					ev = giu.Event()
 
+					ev.OnHover(func() {
+						if iv.worksheet.User.(*worksheetUser).editing != nil {
+						}
+					})
+
 					ev.OnClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
 							// insert selected cell reference to cell being edited
@@ -286,7 +299,7 @@ func (iv *ivycel) layout() {
 
 	w.Layout(
 		iv.layoutMenu(),
-		giu.Style().SetFontSize(18).To(
+		giu.Style().SetFont(iv.font).SetFontSize(18).To(
 			giu.Row(
 				selected,
 				giu.Custom(func() {
@@ -307,14 +320,16 @@ func (iv *ivycel) layout() {
 		),
 
 		// measure height of status bar
-		giu.Custom(func() {
-			iv.statusBarHeight = giu.GetCursorScreenPos().Y
-		}),
-		giu.Spacing(),
-		statusBar,
-		giu.Custom(func() {
-			iv.statusBarHeight = giu.GetCursorScreenPos().Y - iv.statusBarHeight
-		}),
+		giu.Style().SetFont(iv.font).SetFontSize(16.5).To(
+			giu.Custom(func() {
+				iv.statusBarHeight = giu.GetCursorScreenPos().Y
+			}),
+			giu.Spacing(),
+			statusBar,
+			giu.Custom(func() {
+				iv.statusBarHeight = giu.GetCursorScreenPos().Y - iv.statusBarHeight
+			}),
+		),
 	)
 }
 
@@ -357,6 +372,8 @@ func main() {
 
 	wnd := giu.NewMasterWindow("Ivycel", 800, 600, giu.MasterWindowFlagsNotResizable)
 
+	iv.font = giu.Context.FontAtlas.AddFontFromBytes("HackNerd-Regular", fonts.HackNerd_Regular, 15)
 	iv.setStyling()
+
 	wnd.Run(iv.layout)
 }

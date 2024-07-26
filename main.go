@@ -244,7 +244,7 @@ func (iv *ivycel) layout() {
 							// insert selected cell reference to cell being edited
 							editCell := iv.worksheet.User.(*worksheetUser).editing
 							pos := editCell.User.(*cellUser).editCursorPosition
-							ref := iv.ivy.WrapCellReference(cell.Position().Reference())
+							ref := ivy.WrapCellReference(cell.Position().Reference())
 
 							editCell.Entry = fmt.Sprintf("%s%s%s",
 								editCell.Entry[:pos],

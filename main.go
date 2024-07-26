@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 
 	imgui "github.com/AllenDang/cimgui-go"
@@ -18,18 +19,26 @@ type ivycel struct {
 
 	worksheet worksheet.Worksheet
 
-	cellNormal   *giu.StyleSetter
-	cellReadOnly *giu.StyleSetter
-	cellEdit     *giu.StyleSetter
+	cellNormal      *giu.StyleSetter
+	cellReadOnly    *giu.StyleSetter
+	cellEdit        *giu.StyleSetter
+	outputBaseBadge *giu.StyleSetter
 
 	statusBarHeight int
 
 	regularFont *giu.FontInfo
+	boldFont    *giu.FontInfo
+
+	// fonts should be prepared as soon as possible in order for them to
+	// be ready on the frame they are required. without preloading the
+	// loading may be visible to the user
+	fontsPreloaded bool
 }
 
 const (
-	normalFontSize    = 16.5
+	normalFontSize    = 16
 	worksheetFontSize = 18
+	badgeFontSize     = 13
 )
 
 type worksheetUser struct {
@@ -46,6 +55,20 @@ type cellUser struct {
 	// one cell can be in the 'editing' mode at once, we can probably keep this
 	// value in the ivycel type. but this seems more correct
 	editCursorPosition int
+}
+
+// make sure the required fonts have been loaded at the correct size
+func (iv *ivycel) preloadFonts() {
+	if iv.fontsPreloaded {
+		return
+	}
+	iv.fontsPreloaded = true
+
+	giu.Style().
+		SetFont(iv.boldFont).
+		SetFontSize(badgeFontSize).
+		SetColor(giu.StyleColorText, color.Transparent).
+		To(giu.Label(""))
 }
 
 // the window menu is complicated enough to warrant its own function
@@ -97,6 +120,8 @@ func (iv *ivycel) layoutMenu() giu.Widget {
 }
 
 func (iv *ivycel) layout() {
+	iv.preloadFonts()
+
 	var selected *giu.LabelWidget
 	selected = giu.Label(iv.worksheet.User.(*worksheetUser).selected.Position().Reference())
 
@@ -169,6 +194,23 @@ func (iv *ivycel) layout() {
 				// reference to the cell at row/column number
 				cell := iv.worksheet.CellEntry(i, j)
 
+				var badge giu.Widget
+				if !cell.ReadOnly() {
+					bs := cell.Base()
+					if bs != iv.ivy.Base() {
+						badge = giu.Custom(func() {
+							iv.outputBaseBadge.Push()
+							defer iv.outputBaseBadge.Pop()
+							txt := fmt.Sprintf("%d", bs.Output)
+							giu.SameLine()
+							pos := giu.GetCursorScreenPos()
+							pos = pos.Sub(image.Point{X: int(imgui.CalcTextSize(txt).X) + 10, Y: 2})
+							giu.SetCursorScreenPos(pos)
+							giu.Button(txt).Build()
+						})
+					}
+				}
+
 				// how we display the cell depends on whether the cell is the
 				// one currently being edited
 				if iv.worksheet.User.(*worksheetUser).editing == cell {
@@ -220,6 +262,9 @@ func (iv *ivycel) layout() {
 								giu.SetKeyboardFocusHere()
 							}
 							inp.Build()
+							if badge != nil {
+								badge.Build()
+							}
 						}),
 					)
 				} else {
@@ -291,6 +336,9 @@ func (iv *ivycel) layout() {
 							cel.Build()
 							ev.Build()
 							tip.Build()
+							if badge != nil {
+								badge.Build()
+							}
 						}))
 				}
 
@@ -367,10 +415,22 @@ func (iv *ivycel) setStyling() {
 		SetStyleFloat(giu.StyleVarFrameBorderSize, 2).
 		SetStyleFloat(giu.StyleVarFrameRounding, 3).
 		SetColor(giu.StyleColorBorder, color.RGBA{R: 100, G: 100, B: 200, A: 255})
+
+	col := color.RGBA{R: 255, G: 100, B: 100, A: 200}
+	iv.outputBaseBadge = giu.Style().
+		SetFont(iv.boldFont).
+		SetFontSize(badgeFontSize).
+		SetStyle(giu.StyleVarFramePadding, 2, 2).
+		SetStyleFloat(giu.StyleVarFrameRounding, 5).
+		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
+		SetColor(giu.StyleColorButton, col).
+		SetColor(giu.StyleColorButtonActive, col).
+		SetColor(giu.StyleColorButtonHovered, col)
 }
 
 func (iv *ivycel) setFonts() {
 	iv.regularFont = giu.Context.FontAtlas.AddFontFromBytes("HackNerd-Regular", fonts.HackNerd_Regular, 15)
+	iv.boldFont = giu.Context.FontAtlas.AddFontFromBytes("Hack-Bold", fonts.Hack_Bold, 15)
 }
 
 func main() {

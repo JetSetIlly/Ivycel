@@ -23,7 +23,7 @@ type ivycel struct {
 
 	statusBarHeight int
 
-	font *giu.FontInfo
+	regularFont *giu.FontInfo
 }
 
 const (
@@ -65,28 +65,27 @@ func (iv *ivycel) layoutMenu() giu.Widget {
 		})
 	}
 
-	return giu.Style().SetFont(iv.font).SetFontSize(16.5).To(
+	return giu.Style().SetFont(iv.regularFont).SetFontSize(normalFontSize).To(
 		giu.MenuBar().Layout(
-			giu.Menu("File").Layout(
-				giu.MenuItem("Open").Shortcut("Ctrl+O"),
-				giu.MenuItem("Save"),
-				giu.Menu("Save as ...").Layout(
-					giu.MenuItem("Excel file"),
-					giu.MenuItem("CSV file"),
-				),
+			giu.Spacing(),
+			giu.Menu(string(fonts.FileMenu)).Layout(
+				giu.Label("File"),
+				giu.Separator(),
+				giu.MenuItem("Open..."),
+				giu.MenuItem("Save..."),
 			),
-			giu.Menu("Base").Layout(
-				giu.Label("Input"),
-				giu.Spacing(),
+			giu.Spacing(),
+			giu.Menu(string(fonts.InputBase)).Layout(
+				giu.Label("Input Base"),
+				giu.Separator(),
 				inputBaseMenuItem("Binary", 2),
 				inputBaseMenuItem("Octal", 8),
 				inputBaseMenuItem("Decimal", 10),
 				inputBaseMenuItem("Hexadecimal", 16),
-				giu.Spacing(),
+			),
+			giu.Menu(string(fonts.OutputBase)).Layout(
+				giu.Label("Output Base"),
 				giu.Separator(),
-				giu.Spacing(),
-				giu.Label("Output"),
-				giu.Spacing(),
 				outputBaseMenuItem("Binary", 2),
 				outputBaseMenuItem("Octal", 8),
 				outputBaseMenuItem("Decimal", 10),
@@ -97,23 +96,19 @@ func (iv *ivycel) layoutMenu() giu.Widget {
 }
 
 func (iv *ivycel) layout() {
-	w := giu.SingleWindowWithMenuBar()
-
 	var selected *giu.LabelWidget
 	selected = giu.Label(iv.worksheet.User.(*worksheetUser).selected.Position().Reference())
 
 	var formula *giu.InputTextWidget
-	{
-		formula = giu.InputText(&iv.worksheet.User.(*worksheetUser).selected.Entry)
-		formula.Flags(giu.InputTextFlagsEnterReturnsTrue)
-		formula.OnChange(func() {
+	formula = giu.InputText(&iv.worksheet.User.(*worksheetUser).selected.Entry).
+		Flags(giu.InputTextFlagsEnterReturnsTrue).
+		OnChange(func() {
 			iv.worksheet.User.(*worksheetUser).selected.Commit(true)
 			iv.worksheet.RecalculateAll()
 			iv.worksheet.User.(*worksheetUser).editing = nil
 			iv.worksheet.User.(*worksheetUser).focusFormula = true
-		})
-		formula.Size(-1)
-	}
+		}).
+		Size(-1)
 
 	// the main body of the spreadsheet is a table
 	var worksheet *giu.TableWidget
@@ -302,9 +297,9 @@ func (iv *ivycel) layout() {
 		}
 	}
 
-	w.Layout(
+	giu.SingleWindowWithMenuBar().Layout(
 		iv.layoutMenu(),
-		giu.Style().SetFont(iv.font).SetFontSize(18).To(
+		giu.Style().SetFont(iv.regularFont).SetFontSize(18).To(
 			giu.Row(
 				selected,
 				giu.Custom(func() {
@@ -325,7 +320,7 @@ func (iv *ivycel) layout() {
 		),
 
 		// measure height of status bar
-		giu.Style().SetFont(iv.font).SetFontSize(16.5).To(
+		giu.Style().SetFont(iv.regularFont).SetFontSize(16.5).To(
 			giu.Custom(func() {
 				iv.statusBarHeight = giu.GetCursorScreenPos().Y
 			}),
@@ -357,6 +352,10 @@ func (iv *ivycel) setStyling() {
 		SetColor(giu.StyleColorBorder, color.RGBA{R: 100, G: 100, B: 200, A: 255})
 }
 
+func (iv *ivycel) setFonts() {
+	iv.regularFont = giu.Context.FontAtlas.AddFontFromBytes("HackNerd-Regular", fonts.HackNerd_Regular, 15)
+}
+
 func main() {
 	iv := ivycel{
 		ivy: ivy.New(),
@@ -377,7 +376,7 @@ func main() {
 
 	wnd := giu.NewMasterWindow("Ivycel", 800, 600, giu.MasterWindowFlagsNotResizable)
 
-	iv.font = giu.Context.FontAtlas.AddFontFromBytes("HackNerd-Regular", fonts.HackNerd_Regular, 15)
+	iv.setFonts()
 	iv.setStyling()
 
 	wnd.Run(iv.layout)

@@ -23,6 +23,8 @@ type Cell struct {
 	parent   *Cell
 	children []*Cell
 
+	base engine.Base
+
 	User any
 }
 
@@ -31,6 +33,7 @@ func NewCell(engine engine.Interface, worksheet Worksheet, position Position) *C
 		engine:    engine,
 		worksheet: worksheet,
 		position:  position,
+		base:      engine.Base(),
 	}
 }
 
@@ -68,16 +71,17 @@ func (c *Cell) Commit(force bool) {
 		return
 	}
 
+	var err error
+	var r string
+
 	// execute contents of cell
-	r, err := c.engine.Execute(c.position.Reference(), c.Entry)
+	c.engine.WithNumberBase(c.base, func() {
+		r, err = c.engine.Execute(c.position.Reference(), c.Entry)
+	})
 	if err != nil {
 		c.err = err
 		return
 	}
-
-	inputBase, outputBase := c.engine.Base()
-	c.engine.SetBase(outputBase, outputBase)
-	defer c.engine.SetBase(inputBase, outputBase)
 
 	r = strings.TrimSpace(r)
 	rowSplit := strings.Split(r, "\n")
@@ -105,7 +109,9 @@ func (c *Cell) Commit(force bool) {
 
 					rel.Entry = strings.TrimSpace(cv)
 					rel.parent = c
-					rel.result, rel.err = c.engine.Execute(rel.position.Reference(), rel.Entry)
+					c.engine.WithNumberBase(c.base.OutputOnly(), func() {
+						rel.result, rel.err = c.engine.Execute(rel.position.Reference(), rel.Entry)
+					})
 				}
 			}
 		}
@@ -122,4 +128,19 @@ func (c *Cell) Error() error {
 
 func (c *Cell) ReadOnly() bool {
 	return c.parent != nil
+}
+
+func (c *Cell) Base() engine.Base {
+	if c.parent != nil {
+		return c.parent.base
+	}
+	return c.base
+}
+
+func (c *Cell) SetBase(b engine.Base) {
+	if c.parent != nil {
+		c.parent.base = b
+		return
+	}
+	c.base = b
 }

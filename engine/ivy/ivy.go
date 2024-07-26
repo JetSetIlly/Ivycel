@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jetsetilly/ivycel/engine"
 	"robpike.io/ivy/config"
 	"robpike.io/ivy/exec"
 	"robpike.io/ivy/parse"
@@ -25,8 +26,7 @@ type Ivy struct {
 	lastResult       *bytes.Buffer
 	lastError        *bytes.Buffer
 
-	inputBase  int
-	outputBase int
+	base engine.Base
 
 	errorSuppression bool
 	lastErr          error
@@ -41,7 +41,7 @@ func New() Ivy {
 	iv.conf.SetErrOutput(iv.lastError)
 
 	iv.context = exec.NewContext(&iv.conf)
-	iv.SetBase(10, 10)
+	iv.SetBase(engine.Base{Input: 10, Output: 10})
 
 	return iv
 }
@@ -68,6 +68,13 @@ func (iv *Ivy) WithErrorSupression(with func()) {
 	iv.errorSuppression = true
 	with()
 	iv.errorSuppression = false
+}
+
+// run the supplied function but with the error suppression flag set
+func (iv *Ivy) WithNumberBase(base engine.Base, with func()) {
+	iv.setBase(base)
+	with()
+	iv.setBase(iv.base)
 }
 
 func (iv *Ivy) execute(ex string) (string, error) {
@@ -105,21 +112,25 @@ func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 	return result, nil
 }
 
-func (iv *Ivy) SetBase(inputBase int, outputBase int) {
-	iv.inputBase = inputBase
-	iv.outputBase = outputBase
-
+func (iv *Ivy) setBase(base engine.Base) {
 	var err error
 
-	_, err = iv.execute(fmt.Sprintf(")ibase %d", iv.inputBase))
-	_, err = iv.execute(fmt.Sprintf(")obase %d", iv.outputBase))
-
+	_, err = iv.execute(fmt.Sprintf(")ibase %d", base.Input))
 	if err != nil {
 		iv.logError(err)
-		return
+	}
+
+	_, err = iv.execute(fmt.Sprintf(")obase %d", base.Output))
+	if err != nil {
+		iv.logError(err)
 	}
 }
 
-func (iv Ivy) Base() (int, int) {
-	return iv.inputBase, iv.outputBase
+func (iv *Ivy) SetBase(base engine.Base) {
+	iv.base = base
+	iv.setBase(base)
+}
+
+func (iv Ivy) Base() engine.Base {
+	return iv.base
 }

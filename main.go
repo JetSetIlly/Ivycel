@@ -7,6 +7,7 @@ import (
 	imgui "github.com/AllenDang/cimgui-go"
 	"github.com/AllenDang/giu"
 	"github.com/jetsetilly/ivycel/cells"
+	"github.com/jetsetilly/ivycel/engine"
 	"github.com/jetsetilly/ivycel/engine/ivy"
 	"github.com/jetsetilly/ivycel/fonts"
 	"github.com/jetsetilly/ivycel/worksheet"
@@ -49,18 +50,18 @@ type cellUser struct {
 
 // the window menu is complicated enough to warrant its own function
 func (iv *ivycel) layoutMenu() giu.Widget {
-	inputBase, outputBase := iv.ivy.Base()
+	bs := iv.worksheet.User.(*worksheetUser).selected.Base()
 
-	inputBaseMenuItem := func(label string, base int) giu.Widget {
-		return giu.MenuItem(label).Selected(inputBase == base).OnClick(func() {
-			iv.ivy.SetBase(base, outputBase)
+	inputBaseMenuItem := func(label string, nbs int) giu.Widget {
+		return giu.MenuItem(label).Selected(bs.Input == nbs).OnClick(func() {
+			iv.worksheet.User.(*worksheetUser).selected.SetBase(engine.Base{Input: nbs, Output: bs.Output})
 			iv.worksheet.RecalculateAll()
 		})
 	}
 
-	outputBaseMenuItem := func(label string, base int) giu.Widget {
-		return giu.MenuItem(label).Selected(outputBase == base).OnClick(func() {
-			iv.ivy.SetBase(inputBase, base)
+	outputBaseMenuItem := func(label string, nbs int) giu.Widget {
+		return giu.MenuItem(label).Selected(bs.Output == nbs).OnClick(func() {
+			iv.worksheet.User.(*worksheetUser).selected.SetBase(engine.Base{Input: bs.Input, Output: nbs})
 			iv.worksheet.RecalculateAll()
 		})
 	}

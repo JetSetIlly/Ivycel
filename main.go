@@ -113,31 +113,47 @@ func (iv *ivycel) layout() {
 	// the main body of the spreadsheet is a table
 	var worksheet *giu.TableWidget
 	{
-		var cols []*giu.TableColumnWidget
-		var rows []*giu.TableRowWidget
-
 		rowCt, colCt := iv.worksheet.Size()
 
-		worksheet = giu.Table()
-		worksheet.Size(-1, -1-float32(iv.statusBarHeight))
-		worksheet.Freeze(1, 1)
-		worksheet.Flags(giu.TableFlagsScrollY | giu.TableFlagsScrollX | giu.TableFlagsResizable)
+		worksheet = giu.Table().
+			Size(-1, -1-float32(iv.statusBarHeight)).
+			Freeze(1, 1).
+			Flags(giu.TableFlagsScrollY | giu.TableFlagsScrollX | giu.TableFlagsResizable).
+			NoHeader(true)
+
+		// prepare columns for adding to table
+		var cols []*giu.TableColumnWidget
 
 		// first column is the row number and should not be resizeable
 		cols = append(cols, giu.TableColumn("").Flags(giu.TableColumnFlagsNoResize))
 
 		// remaining columns are worksheet columns numbered from "A"
-		for i := range colCt {
-			c := giu.TableColumn(cells.NumericToBase26(i))
-			c.Flags(giu.TableColumnFlagsWidthFixed)
-			c.InnerWidthOrWeight(100)
+		for range colCt {
+			c := giu.TableColumn("").
+				Flags(giu.TableColumnFlagsWidthFixed).
+				InnerWidthOrWeight(100)
 			cols = append(cols, c)
 		}
 
-		// height of each row
+		// add columns to table
+		worksheet.Columns(cols...)
+
+		// height of each row if fixed
 		rowHeight := imgui.CalcTextSize("X").Y
 		_, y := giu.GetItemInnerSpacing()
 		rowHeight += y * 2
+
+		// prepare rows for adding to table
+		var rows []*giu.TableRowWidget
+
+		{ // add column headers manually
+			var rowCols []giu.Widget
+			rowCols = append(rowCols, giu.Label(""))
+			for i := range colCt {
+				rowCols = append(rowCols, giu.Label(cells.NumericToBase26(i)))
+			}
+			rows = append(rows, giu.TableRow(rowCols...))
+		}
 
 		for i := range rowCt {
 			var rowCols []giu.Widget
@@ -281,7 +297,7 @@ func (iv *ivycel) layout() {
 			rows = append(rows, giu.TableRow(rowCols...))
 		}
 
-		worksheet.Columns(cols...)
+		// add rows to table
 		worksheet.Rows(rows...)
 	}
 

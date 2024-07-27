@@ -19,10 +19,14 @@ type ivycel struct {
 
 	worksheet worksheet.Worksheet
 
-	cellNormal      *giu.StyleSetter
-	cellReadOnly    *giu.StyleSetter
-	cellEdit        *giu.StyleSetter
+	cellNormal   *giu.StyleSetter
+	cellReadOnly *giu.StyleSetter
+	cellEdit     *giu.StyleSetter
+
+	// badge styling should push the badges style first and then the specific badge type
+	badges          *giu.StyleSetter
 	outputBaseBadge *giu.StyleSetter
+	inputBaseBadge  *giu.StyleSetter
 
 	statusBarHeight int
 
@@ -185,21 +189,37 @@ func (iv *ivycel) layout() {
 				// reference to the cell at row/column number
 				cell := iv.worksheet.CellEntry(i, j)
 
-				var badge giu.Widget
+				var badges giu.Widget
 				if !cell.ReadOnly() {
 					bs := cell.Base()
-					if bs != iv.ivy.Base() {
-						badge = giu.Custom(func() {
+					badges = giu.Custom(func() {
+						var pos image.Point
+						giu.SameLine()
+						pos = giu.GetCursorScreenPos().Sub(image.Point{X: 5, Y: 2})
+
+						const badgeSpacing = 8
+
+						iv.badges.Push()
+						defer iv.badges.Pop()
+
+						if bs.Output != iv.ivy.Base().Output {
 							iv.outputBaseBadge.Push()
 							defer iv.outputBaseBadge.Pop()
 							txt := fmt.Sprintf("%d", bs.Output)
-							giu.SameLine()
-							pos := giu.GetCursorScreenPos()
-							pos = pos.Sub(image.Point{X: int(imgui.CalcTextSize(txt).X) + 10, Y: 2})
+							pos = pos.Sub(image.Point{X: int(imgui.CalcTextSize(txt).X) + badgeSpacing})
 							giu.SetCursorScreenPos(pos)
 							giu.Button(txt).Build()
-						})
-					}
+						}
+
+						if bs.Input != iv.ivy.Base().Input {
+							iv.inputBaseBadge.Push()
+							defer iv.inputBaseBadge.Pop()
+							txt := fmt.Sprintf("%d", bs.Input)
+							pos = pos.Sub(image.Point{X: int(imgui.CalcTextSize(txt).X) + badgeSpacing})
+							giu.SetCursorScreenPos(pos)
+							giu.Button(txt).Build()
+						}
+					})
 				}
 
 				// how we display the cell depends on whether the cell is the
@@ -253,8 +273,8 @@ func (iv *ivycel) layout() {
 								giu.SetKeyboardFocusHere()
 							}
 							inp.Build()
-							if badge != nil {
-								badge.Build()
+							if badges != nil {
+								badges.Build()
 							}
 						}),
 					)
@@ -327,8 +347,8 @@ func (iv *ivycel) layout() {
 							cel.Build()
 							ev.Build()
 							tip.Build()
-							if badge != nil {
-								badge.Build()
+							if badges != nil {
+								badges.Build()
 							}
 						}))
 				}
@@ -405,13 +425,21 @@ func (iv *ivycel) setStyling() {
 		SetStyleFloat(giu.StyleVarFrameRounding, 3).
 		SetColor(giu.StyleColorBorder, color.RGBA{R: 100, G: 100, B: 200, A: 255})
 
-	col := color.RGBA{R: 255, G: 100, B: 100, A: 200}
-	iv.outputBaseBadge = giu.Style().
+	iv.badges = giu.Style().
 		SetFont(iv.boldFont).
 		SetFontSize(fonts.BadgeFontSize).
 		SetStyle(giu.StyleVarFramePadding, 2, 2).
 		SetStyleFloat(giu.StyleVarFrameRounding, 5).
-		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
+		SetStyleFloat(giu.StyleVarFrameBorderSize, 0)
+
+	col := color.RGBA{R: 255, G: 100, B: 100, A: 200}
+	iv.outputBaseBadge = giu.Style().
+		SetColor(giu.StyleColorButton, col).
+		SetColor(giu.StyleColorButtonActive, col).
+		SetColor(giu.StyleColorButtonHovered, col)
+
+	col = color.RGBA{R: 100, G: 100, B: 255, A: 200}
+	iv.inputBaseBadge = giu.Style().
 		SetColor(giu.StyleColorButton, col).
 		SetColor(giu.StyleColorButtonActive, col).
 		SetColor(giu.StyleColorButtonHovered, col)

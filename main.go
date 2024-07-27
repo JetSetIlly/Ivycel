@@ -19,9 +19,10 @@ type ivycel struct {
 
 	worksheet worksheet.Worksheet
 
-	cellNormal   *giu.StyleSetter
-	cellReadOnly *giu.StyleSetter
-	cellEdit     *giu.StyleSetter
+	cellNormalStyle      *giu.StyleSetter
+	cellReadOnlyStyle    *giu.StyleSetter
+	cellEditStyle        *giu.StyleSetter
+	cellContextMenuStyle *giu.StyleSetter
 
 	// badge styling should push the badges style first and then the specific badge type
 	badges          *giu.StyleSetter
@@ -36,6 +37,9 @@ type ivycel struct {
 	// be ready on the frame they are required. without preloading the
 	// loading may be visible to the user
 	fontsPreloaded bool
+
+	// the current context menu level being shown for cells
+	cellContextMenuLevel int
 }
 
 type worksheetUser struct {
@@ -68,49 +72,155 @@ func (iv *ivycel) preloadFonts() {
 		To(giu.Label(""))
 }
 
-// the window menu is complicated enough to warrant its own function
-func (iv *ivycel) layoutMenu() giu.Widget {
-	bs := iv.worksheet.User.(*worksheetUser).selected.Base()
+// insert text into to cell being edited. insertion is done at the current
+// cursor position
+func (iv *ivycel) insertIntoCellEdit(insert string) {
+	editCell := iv.worksheet.User.(*worksheetUser).editing
+	pos := editCell.User.(*cellUser).editCursorPosition
 
-	inputBaseMenuItem := func(label string, nbs int) giu.Widget {
-		return giu.MenuItem(label).Selected(bs.Input == nbs).OnClick(func() {
-			iv.worksheet.User.(*worksheetUser).selected.SetBase(engine.Base{Input: nbs, Output: bs.Output})
+	editCell.Entry = fmt.Sprintf("%s%s%s",
+		editCell.Entry[:pos],
+		insert,
+		editCell.Entry[pos:],
+	)
+
+	// advance cursor position of edit cell
+	editCell.User.(*cellUser).editCursorPosition += len(insert)
+
+	// cell being editing will need to be refocused after double-click
+	iv.worksheet.User.(*worksheetUser).focusCell = true
+}
+
+// cell context menu is drawn for cell but not if it's being edited. however, if another cell is
+// being edited then that will affect the options offered.
+func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
+	if iv.worksheet.User.(*worksheetUser).editing != nil {
+		editCell := iv.worksheet.User.(*worksheetUser).editing
+		menu := giu.ContextMenu().Layout(
+			giu.Custom(func() {
+				iv.cellContextMenuStyle.Push()
+				defer iv.cellContextMenuStyle.Pop()
+				giu.Column(
+					giu.Label(fmt.Sprintf("%s is being edited", editCell.Position().Reference())),
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+				).Build()
+				giu.Selectable(fmt.Sprintf("Copy reference for %s to %s",
+					cell.Position().Reference(), editCell.Position().Reference())).
+					OnClick(func() {
+						iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Position().Reference()))
+					}).
+					Build()
+
+				giu.Selectable(fmt.Sprintf("Copy value of %s to %s",
+					cell.Position().Reference(), editCell.Position().Reference())).
+					OnClick(func() {
+						iv.insertIntoCellEdit(cell.Result())
+					}).
+					Build()
+			}),
+		)
+		return menu
+	}
+
+	cellBase := cell.Base()
+
+	inputBase := func(label string, newBase int) giu.Widget {
+		return giu.MenuItem(label).Selected(cellBase.Input == newBase).OnClick(func() {
+			cell.SetBase(engine.Base{Input: newBase, Output: cellBase.Output})
 			iv.worksheet.RecalculateAll()
 		})
 	}
 
-	outputBaseMenuItem := func(label string, nbs int) giu.Widget {
-		return giu.MenuItem(label).Selected(bs.Output == nbs).OnClick(func() {
-			iv.worksheet.User.(*worksheetUser).selected.SetBase(engine.Base{Input: bs.Input, Output: nbs})
+	outputBase := func(label string, newBase int) giu.Widget {
+		return giu.MenuItem(label).Selected(cellBase.Output == newBase).OnClick(func() {
+			cell.SetBase(engine.Base{Input: cellBase.Input, Output: newBase})
 			iv.worksheet.RecalculateAll()
 		})
 	}
 
-	return giu.MenuBar().Layout(
-		giu.Spacing(),
-		giu.Menu(string(fonts.FileMenu)).Layout(
-			giu.Label("File"),
-			giu.Separator(),
-			giu.MenuItem("Open..."),
-			giu.MenuItem("Save..."),
-		),
-		giu.Spacing(),
-		giu.Menu(string(fonts.InputBase)).Layout(
-			giu.Label("Input Base"),
-			giu.Separator(),
-			inputBaseMenuItem("Binary", 2),
-			inputBaseMenuItem("Octal", 8),
-			inputBaseMenuItem("Decimal", 10),
-			inputBaseMenuItem("Hexadecimal", 16),
-		),
-		giu.Menu(string(fonts.OutputBase)).Layout(
-			giu.Label("Output Base"),
-			giu.Separator(),
-			outputBaseMenuItem("Binary", 2),
-			outputBaseMenuItem("Octal", 8),
-			outputBaseMenuItem("Decimal", 10),
-			outputBaseMenuItem("Hexadecimal", 16),
-		),
+	return giu.ContextMenu().Layout(
+		giu.Custom(func() {
+			iv.cellContextMenuStyle.Push()
+			defer iv.cellContextMenuStyle.Pop()
+
+			switch iv.cellContextMenuLevel {
+			case 0:
+				giu.Column(
+					giu.Label(fmt.Sprintf("Settings for %s", cell.Position().Reference())),
+
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+
+					giu.Custom(func() {
+						sty := giu.Style().SetDisabled(cell.Entry == "")
+						sty.Push()
+						defer sty.Pop()
+						giu.Selectable("Clear").OnClick(func() {
+							cell.Entry = ""
+							cell.Commit(true)
+							iv.worksheet.RecalculateAll()
+						}).Build()
+					}),
+
+					giu.Selectable("Input Base...").
+						Flags(giu.SelectableFlagsDontClosePopups).
+						OnClick(func() {
+							iv.cellContextMenuLevel = 1
+						}),
+
+					giu.Selectable("Output Base...").
+						Flags(giu.SelectableFlagsDontClosePopups).
+						OnClick(func() {
+							iv.cellContextMenuLevel = 2
+						}),
+
+					giu.Custom(func() {
+						sty := giu.Style().SetDisabled(cellBase == iv.ivy.Base())
+						sty.Push()
+						defer sty.Pop()
+						giu.Selectable("Reset Bases").OnClick(func() {
+							cell.SetBase(iv.ivy.Base())
+							iv.worksheet.RecalculateAll()
+						}).Build()
+					}),
+				).Build()
+			case 1:
+				giu.Column(
+					giu.Row(
+						giu.Button(string(fonts.ParentContextMenu)).OnClick(func() {
+							iv.cellContextMenuLevel = 0
+						}),
+						giu.Label(fmt.Sprintf("Input Base for %s", cell.Position().Reference())),
+					),
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+					inputBase("Binary", 2),
+					inputBase("Octal", 8),
+					inputBase("Decimal", 10),
+					inputBase("Hexadecimal", 16),
+				).Build()
+			case 2:
+				giu.Column(
+					giu.Row(
+						giu.Button(string(fonts.ParentContextMenu)).OnClick(func() {
+							iv.cellContextMenuLevel = 0
+						}),
+						giu.Label(fmt.Sprintf("Output Base for %s", cell.Position().Reference())),
+					),
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+					outputBase("Binary", 2),
+					outputBase("Octal", 8),
+					outputBase("Decimal", 10),
+					outputBase("Hexadecimal", 16),
+				).Build()
+			}
+		}),
 	)
 }
 
@@ -226,7 +336,7 @@ func (iv *ivycel) layout() {
 				// one currently being edited
 				if iv.worksheet.User.(*worksheetUser).editing == cell {
 					giu.SetKeyboardFocusHere()
-					inp := giu.InputText(&cell.Entry).Size(-1)
+					celInp := giu.InputText(&cell.Entry).Size(-1)
 
 					// escape key cancels changes and deactivates the input text
 					// for the cell
@@ -237,12 +347,12 @@ func (iv *ivycel) layout() {
 					// CalbackAlways flag so we can update the editCursorPosition every keypress
 					// and EnterReturnsTrue so that OnChange() is not triggered until editing
 					// has finished
-					inp.Flags(giu.InputTextFlagsCallbackAlways | giu.InputTextFlagsEnterReturnsTrue)
+					celInp.Flags(giu.InputTextFlagsCallbackAlways | giu.InputTextFlagsEnterReturnsTrue)
 
 					// keep track of current cursor position in the input
 					// widget. we use this to insert cell references at the
 					// correct point
-					inp.Callback(func(data imgui.InputTextCallbackData) int {
+					celInp.Callback(func(data imgui.InputTextCallbackData) int {
 						if iv.worksheet.User.(*worksheetUser).focusCell {
 							iv.worksheet.User.(*worksheetUser).focusCell = false
 							data.SetCursorPos(int32(cell.User.(*cellUser).editCursorPosition))
@@ -254,7 +364,7 @@ func (iv *ivycel) layout() {
 
 					// on change function is only called on "enter returns true"
 					// commit changes
-					inp.OnChange(func() {
+					celInp.OnChange(func() {
 						iv.worksheet.User.(*worksheetUser).editing = nil
 						cell.Commit(true)
 						iv.worksheet.RecalculateAll()
@@ -262,8 +372,8 @@ func (iv *ivycel) layout() {
 
 					rowCols = append(rowCols,
 						giu.Custom(func() {
-							iv.cellEdit.Push()
-							defer iv.cellEdit.Pop()
+							iv.cellEditStyle.Push()
+							defer iv.cellEditStyle.Pop()
 							if iv.worksheet.User.(*worksheetUser).focusCell {
 								// focusCell flag will be reset in the input widget's callback
 								// function above. we do this because setting the keyboard focus
@@ -272,7 +382,7 @@ func (iv *ivycel) layout() {
 								// the input cursor
 								giu.SetKeyboardFocusHere()
 							}
-							inp.Build()
+							celInp.Build()
 							if badges != nil {
 								badges.Build()
 							}
@@ -309,22 +419,7 @@ func (iv *ivycel) layout() {
 
 					ev.OnDClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
-							// insert selected cell reference to cell being edited
-							editCell := iv.worksheet.User.(*worksheetUser).editing
-							pos := editCell.User.(*cellUser).editCursorPosition
-							ref := ivy.WrapCellReference(cell.Position().Reference())
-
-							editCell.Entry = fmt.Sprintf("%s%s%s",
-								editCell.Entry[:pos],
-								ref,
-								editCell.Entry[pos:],
-							)
-
-							// advance cursor position of edit cell
-							editCell.User.(*cellUser).editCursorPosition += len(ref)
-
-							// cell being editing will need to be refocused after double-click
-							iv.worksheet.User.(*worksheetUser).focusCell = true
+							iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Position().Reference()))
 						} else if !cell.ReadOnly() {
 							iv.worksheet.User.(*worksheetUser).editing = cell
 							iv.worksheet.User.(*worksheetUser).focusCell = true
@@ -334,9 +429,9 @@ func (iv *ivycel) layout() {
 					// decide on display style for cell
 					var sty *giu.StyleSetter
 					if cell.ReadOnly() {
-						sty = iv.cellReadOnly
+						sty = iv.cellReadOnlyStyle
 					} else {
-						sty = iv.cellNormal
+						sty = iv.cellNormalStyle
 
 					}
 
@@ -344,9 +439,10 @@ func (iv *ivycel) layout() {
 						giu.Custom(func() {
 							sty.Push()
 							defer sty.Pop()
-							cel.Build()
-							ev.Build()
-							tip.Build()
+							giu.Row(
+								cel, iv.cellContextMenu(cell),
+								ev, tip,
+							).Build()
 							if badges != nil {
 								badges.Build()
 							}
@@ -374,7 +470,15 @@ func (iv *ivycel) layout() {
 	}
 
 	giu.SingleWindowWithMenuBar().Layout(
-		iv.layoutMenu(),
+		giu.MenuBar().Layout(
+			giu.Spacing(),
+			giu.Menu(string(fonts.FileMenu)).Layout(
+				giu.Label("File"),
+				giu.Separator(),
+				giu.MenuItem("Open..."),
+				giu.MenuItem("Save..."),
+			),
+		),
 		giu.Style().SetFontSize(fonts.WorksheetFontSize).To(
 			giu.Row(
 				selected,
@@ -408,22 +512,25 @@ func (iv *ivycel) layout() {
 }
 
 func (iv *ivycel) setStyling() {
-	iv.cellNormal = giu.Style().
+	iv.cellNormalStyle = giu.Style().
 		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
 		SetStyleFloat(giu.StyleVarFrameRounding, 0).
 		SetStyle(giu.StyleVarButtonTextAlign, 0, 0).
 		SetColor(giu.StyleColorText, color.RGBA{R: 255, G: 255, B: 255, A: 255})
 
-	iv.cellReadOnly = giu.Style().
+	iv.cellReadOnlyStyle = giu.Style().
 		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
 		SetStyleFloat(giu.StyleVarFrameRounding, 0).
 		SetStyle(giu.StyleVarButtonTextAlign, 0, 0).
 		SetColor(giu.StyleColorButton, color.Transparent)
 
-	iv.cellEdit = giu.Style().
+	iv.cellEditStyle = giu.Style().
 		SetStyleFloat(giu.StyleVarFrameBorderSize, 2).
 		SetStyleFloat(giu.StyleVarFrameRounding, 3).
 		SetColor(giu.StyleColorBorder, color.RGBA{R: 100, G: 100, B: 200, A: 255})
+
+	iv.cellContextMenuStyle = giu.Style().
+		SetFontSize(fonts.ContextMenuFontSize)
 
 	iv.badges = giu.Style().
 		SetFont(iv.boldFont).

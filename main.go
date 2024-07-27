@@ -26,20 +26,13 @@ type ivycel struct {
 
 	statusBarHeight int
 
-	regularFont *giu.FontInfo
-	boldFont    *giu.FontInfo
+	boldFont *giu.FontInfo
 
 	// fonts should be prepared as soon as possible in order for them to
 	// be ready on the frame they are required. without preloading the
 	// loading may be visible to the user
 	fontsPreloaded bool
 }
-
-const (
-	normalFontSize    = 16
-	worksheetFontSize = 18
-	badgeFontSize     = 13
-)
 
 type worksheetUser struct {
 	selected *cells.Cell
@@ -66,7 +59,7 @@ func (iv *ivycel) preloadFonts() {
 
 	giu.Style().
 		SetFont(iv.boldFont).
-		SetFontSize(badgeFontSize).
+		SetFontSize(fonts.BadgeFontSize).
 		SetColor(giu.StyleColorText, color.Transparent).
 		To(giu.Label(""))
 }
@@ -89,32 +82,30 @@ func (iv *ivycel) layoutMenu() giu.Widget {
 		})
 	}
 
-	return giu.Style().SetFont(iv.regularFont).SetFontSize(normalFontSize).To(
-		giu.MenuBar().Layout(
-			giu.Spacing(),
-			giu.Menu(string(fonts.FileMenu)).Layout(
-				giu.Label("File"),
-				giu.Separator(),
-				giu.MenuItem("Open..."),
-				giu.MenuItem("Save..."),
-			),
-			giu.Spacing(),
-			giu.Menu(string(fonts.InputBase)).Layout(
-				giu.Label("Input Base"),
-				giu.Separator(),
-				inputBaseMenuItem("Binary", 2),
-				inputBaseMenuItem("Octal", 8),
-				inputBaseMenuItem("Decimal", 10),
-				inputBaseMenuItem("Hexadecimal", 16),
-			),
-			giu.Menu(string(fonts.OutputBase)).Layout(
-				giu.Label("Output Base"),
-				giu.Separator(),
-				outputBaseMenuItem("Binary", 2),
-				outputBaseMenuItem("Octal", 8),
-				outputBaseMenuItem("Decimal", 10),
-				outputBaseMenuItem("Hexadecimal", 16),
-			),
+	return giu.MenuBar().Layout(
+		giu.Spacing(),
+		giu.Menu(string(fonts.FileMenu)).Layout(
+			giu.Label("File"),
+			giu.Separator(),
+			giu.MenuItem("Open..."),
+			giu.MenuItem("Save..."),
+		),
+		giu.Spacing(),
+		giu.Menu(string(fonts.InputBase)).Layout(
+			giu.Label("Input Base"),
+			giu.Separator(),
+			inputBaseMenuItem("Binary", 2),
+			inputBaseMenuItem("Octal", 8),
+			inputBaseMenuItem("Decimal", 10),
+			inputBaseMenuItem("Hexadecimal", 16),
+		),
+		giu.Menu(string(fonts.OutputBase)).Layout(
+			giu.Label("Output Base"),
+			giu.Separator(),
+			outputBaseMenuItem("Binary", 2),
+			outputBaseMenuItem("Octal", 8),
+			outputBaseMenuItem("Decimal", 10),
+			outputBaseMenuItem("Hexadecimal", 16),
 		),
 	)
 }
@@ -364,7 +355,7 @@ func (iv *ivycel) layout() {
 
 	giu.SingleWindowWithMenuBar().Layout(
 		iv.layoutMenu(),
-		giu.Style().SetFont(iv.regularFont).SetFontSize(18).To(
+		giu.Style().SetFontSize(fonts.WorksheetFontSize).To(
 			giu.Row(
 				selected,
 				giu.Custom(func() {
@@ -385,16 +376,14 @@ func (iv *ivycel) layout() {
 		),
 
 		// measure height of status bar
-		giu.Style().SetFont(iv.regularFont).SetFontSize(16.5).To(
-			giu.Custom(func() {
-				iv.statusBarHeight = giu.GetCursorScreenPos().Y
-			}),
-			giu.Spacing(),
-			statusBar,
-			giu.Custom(func() {
-				iv.statusBarHeight = giu.GetCursorScreenPos().Y - iv.statusBarHeight
-			}),
-		),
+		giu.Custom(func() {
+			iv.statusBarHeight = giu.GetCursorScreenPos().Y
+		}),
+		giu.Spacing(),
+		statusBar,
+		giu.Custom(func() {
+			iv.statusBarHeight = giu.GetCursorScreenPos().Y - iv.statusBarHeight
+		}),
 	)
 }
 
@@ -419,7 +408,7 @@ func (iv *ivycel) setStyling() {
 	col := color.RGBA{R: 255, G: 100, B: 100, A: 200}
 	iv.outputBaseBadge = giu.Style().
 		SetFont(iv.boldFont).
-		SetFontSize(badgeFontSize).
+		SetFontSize(fonts.BadgeFontSize).
 		SetStyle(giu.StyleVarFramePadding, 2, 2).
 		SetStyleFloat(giu.StyleVarFrameRounding, 5).
 		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
@@ -429,8 +418,12 @@ func (iv *ivycel) setStyling() {
 }
 
 func (iv *ivycel) setFonts() {
-	iv.regularFont = giu.Context.FontAtlas.AddFontFromBytes("HackNerd-Regular", fonts.HackNerd_Regular, 15)
-	iv.boldFont = giu.Context.FontAtlas.AddFontFromBytes("Hack-Bold", fonts.Hack_Bold, 15)
+	// adding more than one default font will merge the two fonts together. the order is important
+	// because we want the normal alphanumeric glyphs from HackRegular and not FontAwesome
+	giu.Context.FontAtlas.SetDefaultFontFromBytes(fonts.FontAwesome, fonts.NormalFontSize)
+	giu.Context.FontAtlas.SetDefaultFontFromBytes(fonts.Hack_Regular, fonts.NormalFontSize)
+
+	iv.boldFont = giu.Context.FontAtlas.AddFontFromBytes("Hack-Bold", fonts.Hack_Bold, fonts.NormalFontSize)
 }
 
 func main() {

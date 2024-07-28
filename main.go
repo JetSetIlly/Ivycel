@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"strings"
 
 	imgui "github.com/AllenDang/cimgui-go"
 	"github.com/AllenDang/giu"
@@ -101,24 +102,45 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 				iv.cellContextMenuStyle.Push()
 				defer iv.cellContextMenuStyle.Pop()
 				giu.Column(
-					giu.Label(fmt.Sprintf("%s is being edited", editCell.Position().Reference())),
+					giu.Label(fmt.Sprintf("Editing %s", editCell.Position().Reference())),
 					giu.Spacing(),
 					giu.Separator(),
 					giu.Spacing(),
 				).Build()
-				giu.Selectable(fmt.Sprintf("Copy reference for %s to %s",
-					cell.Position().Reference(), editCell.Position().Reference())).
+
+				giu.Label("Insert...").Build()
+
+				giu.Selectable(fmt.Sprintf(" Reference to %s", cell.Position().Reference())).
 					OnClick(func() {
 						iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Position().Reference()))
 					}).
 					Build()
 
-				giu.Selectable(fmt.Sprintf("Copy value of %s to %s",
-					cell.Position().Reference(), editCell.Position().Reference())).
-					OnClick(func() {
-						iv.insertIntoCellEdit(cell.Result())
-					}).
-					Build()
+				if cell.Parent() != nil {
+					giu.Selectable(fmt.Sprintf(" Reference to parent (%s)", cell.Parent().Position().Reference())).
+						OnClick(func() {
+							iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Parent().Position().Reference()))
+						}).
+						Build()
+
+				} else if cell.HasChildren() {
+					giu.Selectable(
+						fmt.Sprintf(" Reference to root of %s", cell.Position().Reference())).
+						OnClick(func() {
+							iv.insertIntoCellEdit(ivy.WrapCellReference(
+								fmt.Sprintf("%s%s", cell.Position().Reference(), cell.RootIndex()),
+							))
+						}).
+						Build()
+				}
+
+				if strings.TrimSpace(cell.Result()) != "" {
+					giu.Selectable(fmt.Sprintf(" Literal value of %v", cell.Result())).
+						OnClick(func() {
+							iv.insertIntoCellEdit(cell.Result())
+						}).
+						Build()
+				}
 			}),
 		)
 		return menu
@@ -148,7 +170,7 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 			switch iv.cellContextMenuLevel {
 			case 0:
 				giu.Column(
-					giu.Label(fmt.Sprintf("Settings for %s", cell.Position().Reference())),
+					giu.Label(fmt.Sprintf("Cell %s", cell.Position().Reference())),
 
 					giu.Spacing(),
 					giu.Separator(),

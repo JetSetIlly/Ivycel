@@ -112,6 +112,13 @@ func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 	return result, nil
 }
 
+// shape of the value at the supplied reference. ref should not be wrapped
+func (iv *Ivy) Shape(ref string) string {
+	ref, _ = normaliseCellReferences(ref, "")
+	s, _ := iv.execute(fmt.Sprintf("rho %s", ref))
+	return s
+}
+
 func (iv *Ivy) setBase(base engine.Base) {
 	var err error
 

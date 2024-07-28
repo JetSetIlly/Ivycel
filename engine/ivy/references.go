@@ -5,7 +5,9 @@ import (
 	"regexp"
 )
 
-var CellReferenceMatch = regexp.MustCompile("{([[:alpha:]]+[[:digit:]]+)}")
+// match anything inside paired braces that begins with a sequence of letters
+// and then a sequence of digits. spaces not allowed at all
+var CellReferenceMatch = regexp.MustCompile("{([[:alpha:]]+[[:digit:]]+[[:^space:]]*)}")
 
 var normalisedCellReferencePrefix = "v"
 

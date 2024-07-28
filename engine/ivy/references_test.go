@@ -61,59 +61,106 @@ func TestCellReference(t *testing.T) {
 	ok = ivy.CellReferenceMatch.MatchString("{A1 }")
 	ExpectEquality(t, ok, false)
 
-	// multiple instances can appear in the string
-	ok = ivy.CellReferenceMatch.MatchString(" {A1} + {B100}")
+}
+
+func TestCellReferenceWithIndexing(t *testing.T) {
+	var ok bool
+
+	// indexing is not explicitely allowed but should be captured and used in
+	// the ivy expression as far as possible
+
+	ok = ivy.CellReferenceMatch.MatchString("{A1[0]}")
+	ExpectEquality(t, ok, true)
+	ok = ivy.CellReferenceMatch.MatchString("{A1[0][1]}")
 	ExpectEquality(t, ok, true)
 
-	ok = ivy.CellReferenceMatch.MatchString(" {A1} + {B100} / {ZZZ2309}")
+	// this is an illegal reference as far as ivy is concerned but we don't
+	// worry about that and pass it on as normal
+	ok = ivy.CellReferenceMatch.MatchString("{A1[}")
 	ExpectEquality(t, ok, true)
+	ok = ivy.CellReferenceMatch.MatchString("{A1[a[[]}")
+	ExpectEquality(t, ok, true)
+
+	// but spaces are detected and not allowed
+	ok = ivy.CellReferenceMatch.MatchString("{A1 [}")
+	ExpectEquality(t, ok, false)
+	ok = ivy.CellReferenceMatch.MatchString("{A1[ 0]}")
+	ExpectEquality(t, ok, false)
+	ok = ivy.CellReferenceMatch.MatchString("{A1[0] [ 1]}")
+	ExpectEquality(t, ok, false)
 }
 
-// these strings should match after wrapping. wrapping should be part of the test loop
-var expectedSuccess = []string{
-	"A1",
-	"ZZ100",
-}
+// the prefix we use for replacement isn't important
+const prefix = "v"
 
-// these strings shouldn't match, even after wrapping
-var expectedFail = []string{
-	" A1",
-	"ZZ 100",
-	"1A",
-	"100ZZ",
-}
-
-func TestCellReferenceReplace(t *testing.T) {
-	// the prefix we use for replacement isn't important
-	prefix := "v"
-
-	for _, s := range expectedSuccess {
-		w := ivy.WrapCellReference(s)
-		r := ivy.CellReferenceMatch.ReplaceAllString(w, fmt.Sprintf("%s$1", prefix))
-		ExpectEquality(t, r, fmt.Sprintf("%s%s", prefix, s))
+func TestCellReferenceByTable(t *testing.T) {
+	type test struct {
+		inp   string
+		match string
+		conv  string
 	}
 
-	for _, s := range expectedFail {
-		w := ivy.WrapCellReference(s)
-		r := ivy.CellReferenceMatch.ReplaceAllString(w, fmt.Sprintf("%s$1", prefix))
-		ExpectEquality(t, r, w)
-	}
-}
+	var testingTable = []test{
+		{inp: "A1", match: "A1", conv: fmt.Sprintf("%sA1", prefix)},
+		{inp: "ZZ100", match: "ZZ100", conv: fmt.Sprintf("%sZZ100", prefix)},
+		{inp: " A1"},
+		{inp: "ZZ 100"},
+		{inp: "1A"},
+		{inp: "100ZZ"},
 
-func TestCellReferenceSubmatch(t *testing.T) {
+		// indexing tests
+		{inp: "A1[0]", match: "A1[0]", conv: fmt.Sprintf("%sA1[0]", prefix)},
+
+		// even though we know for sure that [0 is not a valid index we need to
+		// identify it and pass it to ivy for parsing
+		{inp: "A1[0", match: "A1[0", conv: fmt.Sprintf("%sA1[0", prefix)},
+	}
+
 	var matches [][]string
 
-	for _, s := range expectedSuccess {
-		w := ivy.WrapCellReference(s)
+	for _, tst := range testingTable {
+		w := ivy.WrapCellReference(tst.inp)
 		matches = ivy.CellReferenceMatch.FindAllStringSubmatch(w, 1)
-		ExpectEquality(t, len(matches), 1)
-		ExpectEquality(t, len(matches[0]), 2)
-		ExpectEquality(t, matches[0][1], s)
+		if tst.match != "" {
+			ExpectEquality(t, len(matches), 1)
+			ExpectEquality(t, len(matches[0]), 2)
+			ExpectEquality(t, matches[0][1], tst.match)
+
+			r := ivy.CellReferenceMatch.ReplaceAllString(w, fmt.Sprintf("%s$1", prefix))
+			ExpectEquality(t, r, tst.conv)
+		} else {
+			ExpectEquality(t, len(matches), 0)
+
+			// replacement will fail so returned string should equal the wrapped string
+			r := ivy.CellReferenceMatch.ReplaceAllString(w, fmt.Sprintf("%s$1", prefix))
+			ExpectEquality(t, r, w)
+		}
+	}
+}
+
+func TestCellReferenceInExpressions(t *testing.T) {
+	type test struct {
+		inp  string
+		repl string
 	}
 
-	for _, s := range expectedFail {
-		w := ivy.WrapCellReference(s)
-		matches = ivy.CellReferenceMatch.FindAllStringSubmatch(w, 1)
-		ExpectEquality(t, len(matches), 0)
+	var testingTable []test = []test{
+		{
+			inp:  "{A1} + {B100}",
+			repl: "vA1 + vB100",
+		},
+		{
+			inp:  "{A1} + {B100} / {ZZZ2309}",
+			repl: "vA1 + vB100 / vZZZ2309",
+		},
+		{
+			inp:  "{A1} + {B100[1]} / {ZZZ2309[100][203]}",
+			repl: "vA1 + vB100[1] / vZZZ2309[100][203]",
+		},
+	}
+
+	for _, tst := range testingTable {
+		r := ivy.CellReferenceMatch.ReplaceAllString(tst.inp, fmt.Sprintf("%s$1", prefix))
+		ExpectEquality(t, r, tst.repl)
 	}
 }

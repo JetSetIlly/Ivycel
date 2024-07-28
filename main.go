@@ -20,10 +20,11 @@ type ivycel struct {
 
 	worksheet worksheet.Worksheet
 
-	cellNormalStyle      *giu.StyleSetter
-	cellReadOnlyStyle    *giu.StyleSetter
-	cellEditStyle        *giu.StyleSetter
-	cellContextMenuStyle *giu.StyleSetter
+	cellNormalStyle   *giu.StyleSetter
+	cellReadOnlyStyle *giu.StyleSetter
+	cellEditStyle     *giu.StyleSetter
+	contextMenuStyle  *giu.StyleSetter
+	headerStyle       *giu.StyleSetter
 
 	// badge styling should push the badges style first and then the specific badge type
 	badges          *giu.StyleSetter
@@ -99,8 +100,8 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 		editCell := iv.worksheet.User.(*worksheetUser).editing
 		menu := giu.ContextMenu().Layout(
 			giu.Custom(func() {
-				iv.cellContextMenuStyle.Push()
-				defer iv.cellContextMenuStyle.Pop()
+				iv.contextMenuStyle.Push()
+				defer iv.contextMenuStyle.Pop()
 				giu.Column(
 					giu.Label(fmt.Sprintf("Editing %s", editCell.Position().Reference())),
 					giu.Spacing(),
@@ -164,8 +165,8 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 
 	return giu.ContextMenu().Layout(
 		giu.Custom(func() {
-			iv.cellContextMenuStyle.Push()
-			defer iv.cellContextMenuStyle.Pop()
+			iv.contextMenuStyle.Push()
+			defer iv.contextMenuStyle.Pop()
 
 			switch iv.cellContextMenuLevel {
 			case 0:
@@ -266,7 +267,7 @@ func (iv *ivycel) layout() {
 	// the main body of the spreadsheet is a table
 	var worksheet *giu.TableWidget
 	{
-		rowCt, colCt := iv.worksheet.Size()
+		rowCount, colCt := iv.worksheet.Size()
 
 		worksheet = giu.Table().
 			Size(-1, -1-float32(iv.statusBarHeight)).
@@ -302,24 +303,55 @@ func (iv *ivycel) layout() {
 		{ // add column headers manually
 			var rowCols []giu.Widget
 			rowCols = append(rowCols, giu.Label(""))
-			for i := range colCt {
-				rowCols = append(rowCols, giu.Label(cells.NumericToBase26(i)))
+			for coli := range colCt {
+				rowCols = append(rowCols,
+					giu.Custom(func() {
+						col := cells.NumericToBase26(coli)
+						iv.headerStyle.To(
+							giu.Button(col).
+								Size(-1, fonts.WorksheetHeaderSize),
+						).Build()
+						giu.ContextMenu().Layout(giu.Custom(func() {
+							iv.contextMenuStyle.Push()
+							defer iv.contextMenuStyle.Pop()
+							giu.Column(
+								giu.Selectable(fmt.Sprintf("Insert column before %s", col)).
+									OnClick(func() {
+										iv.worksheet.InsertColumn(coli)
+									}),
+							).Build()
+						})).Build()
+					}),
+				)
 			}
 			rows = append(rows, giu.TableRow(rowCols...))
 		}
 
-		for i := range rowCt {
+		for rowi := range rowCount {
 			var rowCols []giu.Widget
 
 			// first column of each row is the row number
 			rowCols = append(rowCols, giu.Custom(func() {
-				giu.AlignTextToFramePadding()
-				giu.Label(fmt.Sprintf(" %d", i+1)).Build()
+				lbl := fmt.Sprintf(" %d", rowi+1)
+				w, _ := giu.CalcTextSize(lbl)
+				iv.headerStyle.To(
+					giu.Button(lbl).Size(w, rowHeight),
+				).Build()
+				giu.ContextMenu().Layout(giu.Custom(func() {
+					iv.contextMenuStyle.Push()
+					defer iv.contextMenuStyle.Pop()
+					giu.Column(
+						giu.Selectable(fmt.Sprintf("Insert row before row %d", rowi+1)).
+							OnClick(func() {
+								iv.worksheet.InsertRow(rowi)
+							}),
+					).Build()
+				})).Build()
 			}))
 
-			for j := range colCt {
+			for coli := range colCt {
 				// reference to the cell at row/column number
-				cell := iv.worksheet.CellEntry(i, j)
+				cell := iv.worksheet.Cell(rowi, coli)
 
 				var badges giu.Widget
 				if !cell.ReadOnly() {
@@ -551,8 +583,19 @@ func (iv *ivycel) setStyling() {
 		SetStyleFloat(giu.StyleVarFrameRounding, 3).
 		SetColor(giu.StyleColorBorder, color.RGBA{R: 100, G: 100, B: 200, A: 255})
 
-	iv.cellContextMenuStyle = giu.Style().
+	iv.contextMenuStyle = giu.Style().
 		SetFontSize(fonts.ContextMenuFontSize)
+
+	vcol := imgui.CurrentStyle().Colors()[giu.StyleColorTableRowBg]
+	col := color.RGBA{R: uint8(vcol.X), G: uint8(vcol.Y), B: uint8(vcol.Z), A: uint8(vcol.W)}
+
+	iv.headerStyle = giu.Style().
+		SetFontSize(fonts.WorksheetHeaderSize).
+		SetStyleFloat(giu.StyleVarFrameBorderSize, 0).
+		SetStyle(giu.StyleVarFramePadding, 0, 0).
+		SetColor(giu.StyleColorButton, col).
+		SetColor(giu.StyleColorButtonActive, col).
+		SetColor(giu.StyleColorButtonHovered, col)
 
 	iv.badges = giu.Style().
 		SetFont(iv.boldFont).
@@ -561,7 +604,7 @@ func (iv *ivycel) setStyling() {
 		SetStyleFloat(giu.StyleVarFrameRounding, 5).
 		SetStyleFloat(giu.StyleVarFrameBorderSize, 0)
 
-	col := color.RGBA{R: 255, G: 100, B: 100, A: 200}
+	col = color.RGBA{R: 255, G: 100, B: 100, A: 200}
 	iv.outputBaseBadge = giu.Style().
 		SetColor(giu.StyleColorButton, col).
 		SetColor(giu.StyleColorButtonActive, col).
@@ -588,17 +631,14 @@ func main() {
 		ivy: ivy.New(),
 	}
 
-	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 20, 20)
-	iv.worksheet.User = &worksheetUser{
-		selected:     iv.worksheet.CellEntry(0, 0),
-		focusFormula: true,
+	addCellUser := func(cell *cells.Cell) {
+		cell.User = &cellUser{}
 	}
 
-	rowCt, colCt := iv.worksheet.Size()
-	for i := range rowCt {
-		for j := range colCt {
-			iv.worksheet.CellEntry(i, j).User = &cellUser{}
-		}
+	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 20, 20, addCellUser)
+	iv.worksheet.User = &worksheetUser{
+		selected:     iv.worksheet.Cell(0, 0),
+		focusFormula: true,
 	}
 
 	wnd := giu.NewMasterWindow("Ivycel", 800, 600, giu.MasterWindowFlagsNotResizable)

@@ -10,14 +10,17 @@ import (
 
 var UnsupportedShape = errors.New("unsupported shape")
 
+type CellID string
+
 type Worksheet interface {
 	RelativeCell(root *Cell, pos Position) *Cell
+	Position(CellID) Position
 }
 
 type Cell struct {
 	engine    engine.Interface
 	worksheet Worksheet
-	position  Position
+	id        CellID
 
 	base engine.Base
 
@@ -31,17 +34,21 @@ type Cell struct {
 	User any
 }
 
-func NewCell(engine engine.Interface, worksheet Worksheet, position Position) *Cell {
+func NewCell(engine engine.Interface, worksheet Worksheet, id CellID) *Cell {
 	return &Cell{
+		id:        id,
 		engine:    engine,
 		worksheet: worksheet,
-		position:  position,
 		base:      engine.Base(),
 	}
 }
 
+func (c Cell) ID() CellID {
+	return c.id
+}
+
 func (c Cell) Position() Position {
-	return c.position
+	return c.worksheet.Position(c.id)
 }
 
 // force argument will commit the cell even if the cell is read-only. this is
@@ -69,7 +76,7 @@ func (c *Cell) Commit(force bool) {
 	c.Entry = strings.TrimSpace(c.Entry)
 	if c.Entry == "" {
 		if force {
-			_, _ = c.engine.Execute(c.position.Reference(), "0")
+			_, _ = c.engine.Execute(c.Position().Reference(), "0")
 		}
 		return
 	}
@@ -79,7 +86,7 @@ func (c *Cell) Commit(force bool) {
 
 	// execute contents of cell
 	c.engine.WithNumberBase(c.base, func() {
-		r, err = c.engine.Execute(c.position.Reference(), c.Entry)
+		r, err = c.engine.Execute(c.Position().Reference(), c.Entry)
 	})
 	if err != nil {
 		c.err = err
@@ -163,7 +170,7 @@ func (c *Cell) Commit(force bool) {
 			rel.parent = c
 			c.engine.WithErrorSupression(func() {
 				c.engine.WithNumberBase(c.base.OutputOnly(), func() {
-					rel.result, rel.err = c.engine.Execute(rel.position.Reference(), rel.Entry)
+					rel.result, rel.err = c.engine.Execute(rel.Position().Reference(), rel.Entry)
 				})
 			})
 		}
@@ -212,7 +219,7 @@ func (c *Cell) RootIndex() string {
 		return ""
 	}
 
-	shape := c.engine.Shape(c.position.Reference())
+	shape := c.engine.Shape(c.Position().Reference())
 	n := len(strings.Fields(shape))
 
 	// the Repeat() function assumes that we're counting from 1 inside the

@@ -1,47 +1,113 @@
 package worksheet
 
 import (
+	"fmt"
+	"math/rand"
+
 	"github.com/jetsetilly/ivycel/cells"
 	"github.com/jetsetilly/ivycel/engine"
 )
 
+type User func(cell *cells.Cell)
+
 type Worksheet struct {
 	engine engine.Interface
-	cells  [][]*cells.Cell
+	user   User
+
+	rows    int
+	columns int
+
+	// current positions of cells references by cell ID
+	positions       map[cells.CellID]cells.Position
+	cellsByPosition map[cells.Position]cells.CellID
+	cellsByID       map[cells.CellID]*cells.Cell
 
 	User any
 }
 
-func NewWorksheet(engine engine.Interface, rows int, columns int) Worksheet {
+func NewWorksheet(engine engine.Interface, rows int, columns int, user User) Worksheet {
 	ws := Worksheet{
-		engine: engine,
+		engine:          engine,
+		user:            user,
+		rows:            rows,
+		columns:         columns,
+		positions:       make(map[cells.CellID]cells.Position),
+		cellsByPosition: make(map[cells.Position]cells.CellID),
+		cellsByID:       make(map[cells.CellID]*cells.Cell),
 	}
 
-	ws.cells = make([][]*cells.Cell, rows)
-	for i := 0; i < len(ws.cells); i++ {
-		ws.cells[i] = make([]*cells.Cell, columns)
-		for j := 0; j < len(ws.cells[i]); j++ {
-			ws.cells[i][j] = cells.NewCell(ws.engine, ws, cells.Position{Row: i, Column: j})
-			ws.engine.Execute(ws.cells[i][j].Position().Reference(), "0")
+	for row := range ws.rows {
+		for col := range ws.columns {
+			ws.createCell(cells.Position{Row: row, Column: col})
 		}
 	}
 
 	return ws
 }
 
-func (ws Worksheet) CellEntry(row int, column int) *cells.Cell {
-	return ws.cells[row][column]
+func (ws *Worksheet) createCell(pos cells.Position) {
+	id := cells.CellID(fmt.Sprintf("cell%v", rand.Int63()))
+	ws.positions[id] = pos
+	ws.cellsByPosition[pos] = id
+	cell := cells.NewCell(ws.engine, ws, id)
+	ws.cellsByID[id] = cell
+	ws.engine.Execute(pos.Reference(), "0")
+	ws.user(cell)
+}
+
+func (ws Worksheet) Position(cell cells.CellID) cells.Position {
+	return ws.positions[cell]
+}
+
+func (ws *Worksheet) InsertRow(at int) {
+	for rowi := ws.rows; rowi >= at; rowi-- {
+		for coli := range ws.columns {
+			pos := cells.Position{Row: rowi, Column: coli}
+			id := ws.cellsByPosition[pos]
+			pos.Row++
+			ws.cellsByPosition[pos] = id
+			ws.positions[id] = pos
+		}
+	}
+	for coli := range ws.columns {
+		ws.createCell(cells.Position{Row: at, Column: coli})
+	}
+	ws.rows++
+	ws.RecalculateAll()
+}
+
+func (ws *Worksheet) InsertColumn(at int) {
+	for coli := ws.columns; coli >= at; coli-- {
+		for rowi := range ws.rows {
+			pos := cells.Position{Row: rowi, Column: coli}
+			id := ws.cellsByPosition[pos]
+			pos.Column++
+			ws.cellsByPosition[pos] = id
+			ws.positions[id] = pos
+		}
+	}
+	for rowi := range ws.rows {
+		ws.createCell(cells.Position{Row: rowi, Column: at})
+	}
+	ws.columns++
+	ws.RecalculateAll()
+}
+
+func (ws Worksheet) Cell(row int, column int) *cells.Cell {
+	id := ws.cellsByPosition[cells.Position{Row: row, Column: column}]
+	return ws.cellsByID[id]
 }
 
 func (ws Worksheet) Size() (int, int) {
-	return len(ws.cells), len(ws.cells[0])
+	return ws.rows, ws.columns
 }
 
 func (ws Worksheet) RecalculateAll() {
 	ws.engine.WithErrorSupression(func() {
-		for i := 0; i < len(ws.cells); i++ {
-			for j := 0; j < len(ws.cells[i]); j++ {
-				ws.cells[i][j].Commit(false)
+		for rowi := range ws.rows {
+			for coli := range ws.columns {
+				id := ws.cellsByPosition[cells.Position{Row: rowi, Column: coli}]
+				ws.cellsByID[id].Commit(false)
 			}
 		}
 	})
@@ -50,8 +116,9 @@ func (ws Worksheet) RecalculateAll() {
 func (ws Worksheet) RelativeCell(root *cells.Cell, pos cells.Position) *cells.Cell {
 	pos.Row += root.Position().Row
 	pos.Column += root.Position().Column
-	if pos.Row >= len(ws.cells) || pos.Column >= len(ws.cells[pos.Row]) {
+	if pos.Row >= ws.rows || pos.Column >= ws.columns {
 		return nil
 	}
-	return ws.cells[pos.Row][pos.Column]
+	id := ws.cellsByPosition[pos]
+	return ws.cellsByID[id]
 }

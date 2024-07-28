@@ -25,5 +25,6 @@ const (
 	NormalFontSize      = 16
 	ContextMenuFontSize = 15
 	WorksheetFontSize   = 18
+	WorksheetHeaderSize = 16
 	BadgeFontSize       = 13
 )

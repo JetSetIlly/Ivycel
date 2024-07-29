@@ -298,6 +298,9 @@ func (iv *ivycel) layout() {
 		_, y := giu.GetItemInnerSpacing()
 		rowHeight += y * 2
 
+		// width of row header
+		rowHeaderWidth, _ := giu.CalcTextSize(strings.Repeat("X", len(fmt.Sprintf("%d", rowCount))+1))
+
 		// prepare rows for adding to table
 		var rows []*giu.TableRowWidget
 
@@ -336,7 +339,8 @@ func (iv *ivycel) layout() {
 				lbl := fmt.Sprintf(" %d", rowi+1)
 				w, _ := giu.CalcTextSize(lbl)
 				iv.headerStyle.To(
-					giu.Button(lbl).Size(w, rowHeight),
+					giu.Button(lbl).Size(w, rowHeight).
+						Size(rowHeaderWidth, rowHeight),
 				).Build()
 				giu.ContextMenu().Layout(giu.Custom(func() {
 					iv.contextMenuStyle.Push()

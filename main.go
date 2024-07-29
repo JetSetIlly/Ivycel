@@ -636,13 +636,13 @@ func main() {
 		cell.User = &cellUser{}
 	}
 
-	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 20, 20, addCellUser)
+	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 30, 30, addCellUser)
 	iv.worksheet.User = &worksheetUser{
 		selected:     iv.worksheet.Cell(0, 0),
 		focusFormula: true,
 	}
 
-	wnd := giu.NewMasterWindow("Ivycel", 800, 600, giu.MasterWindowFlagsNotResizable)
+	wnd := giu.NewMasterWindow("Ivycel", 800, 600, 0)
 
 	iv.setFonts()
 	iv.setStyling()

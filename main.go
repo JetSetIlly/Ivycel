@@ -103,6 +103,7 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 			giu.Custom(func() {
 				iv.contextMenuStyle.Push()
 				defer iv.contextMenuStyle.Pop()
+
 				giu.Column(
 					giu.Label(fmt.Sprintf("Editing %s", editCell.Position().Reference())),
 					giu.Spacing(),
@@ -112,36 +113,31 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 
 				giu.Label("Insert...").Build()
 
-				giu.Selectable(fmt.Sprintf(" Reference to %s", cell.Position().Reference())).
+				giu.MenuItem(fmt.Sprintf(" Reference to %s", cell.Position().Reference())).
 					OnClick(func() {
 						iv.insertIntoCellEdit(references.WrapCellReference(cell.Position().Reference()))
-					}).
-					Build()
+					}).Build()
 
 				if cell.Parent() != nil {
-					giu.Selectable(fmt.Sprintf(" Reference to parent (%s)", cell.Parent().Position().Reference())).
+					giu.MenuItem(fmt.Sprintf(" Reference to parent (%s)", cell.Parent().Position().Reference())).
 						OnClick(func() {
 							iv.insertIntoCellEdit(references.WrapCellReference(cell.Parent().Position().Reference()))
-						}).
-						Build()
+						}).Build()
 
 				} else if cell.HasChildren() {
-					giu.Selectable(
-						fmt.Sprintf(" Reference to root of %s", cell.Position().Reference())).
+					giu.MenuItem(fmt.Sprintf(" Reference to root of %s", cell.Position().Reference())).
 						OnClick(func() {
 							iv.insertIntoCellEdit(references.WrapCellReference(
 								fmt.Sprintf("%s%s", cell.Position().Reference(), cell.RootIndex()),
 							))
-						}).
-						Build()
+						}).Build()
 				}
 
 				if strings.TrimSpace(cell.Result()) != "" {
-					giu.Selectable(fmt.Sprintf(" Literal value of %v", cell.Result())).
+					giu.MenuItem(fmt.Sprintf(" Literal value of %v", cell.Result())).
 						OnClick(func() {
 							iv.insertIntoCellEdit(cell.Result())
-						}).
-						Build()
+						}).Build()
 				}
 			}),
 		)
@@ -169,81 +165,37 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 			iv.contextMenuStyle.Push()
 			defer iv.contextMenuStyle.Pop()
 
-			switch iv.cellContextMenuLevel {
-			case 0:
-				giu.Column(
-					giu.Label(fmt.Sprintf("Cell %s", cell.Position().Reference())),
-
-					giu.Spacing(),
-					giu.Separator(),
-					giu.Spacing(),
-
-					giu.Custom(func() {
-						sty := giu.Style().SetDisabled(cell.Entry == "")
-						sty.Push()
-						defer sty.Pop()
-						giu.Selectable("Clear").OnClick(func() {
-							cell.Entry = ""
-							cell.Commit(true)
-							iv.worksheet.RecalculateAll()
-						}).Build()
+			giu.Column(
+				giu.Label(fmt.Sprintf("Cell %s", cell.Position().Reference())),
+				giu.Spacing(),
+				giu.Separator(),
+				giu.Spacing(),
+				giu.MenuItem("Clear").
+					Enabled(cell.Entry != "").
+					OnClick(func() {
+						cell.Entry = ""
+						cell.Commit(true)
+						iv.worksheet.RecalculateAll()
 					}),
-
-					giu.Selectable("Input Base...").
-						Flags(giu.SelectableFlagsDontClosePopups).
-						OnClick(func() {
-							iv.cellContextMenuLevel = 1
-						}),
-
-					giu.Selectable("Output Base...").
-						Flags(giu.SelectableFlagsDontClosePopups).
-						OnClick(func() {
-							iv.cellContextMenuLevel = 2
-						}),
-
-					giu.Custom(func() {
-						sty := giu.Style().SetDisabled(cellBase == iv.ivy.Base())
-						sty.Push()
-						defer sty.Pop()
-						giu.Selectable("Reset Bases").OnClick(func() {
-							cell.SetBase(iv.ivy.Base())
-							iv.worksheet.RecalculateAll()
-						}).Build()
-					}),
-				).Build()
-			case 1:
-				giu.Column(
-					giu.Row(
-						giu.Button(string(fonts.ParentContextMenu)).OnClick(func() {
-							iv.cellContextMenuLevel = 0
-						}),
-						giu.Label(fmt.Sprintf("Input Base for %s", cell.Position().Reference())),
-					),
-					giu.Spacing(),
-					giu.Separator(),
-					giu.Spacing(),
+				giu.Menu("Input Base").Layout(
 					inputBase("Binary", 2),
 					inputBase("Octal", 8),
 					inputBase("Decimal", 10),
 					inputBase("Hexadecimal", 16),
-				).Build()
-			case 2:
-				giu.Column(
-					giu.Row(
-						giu.Button(string(fonts.ParentContextMenu)).OnClick(func() {
-							iv.cellContextMenuLevel = 0
-						}),
-						giu.Label(fmt.Sprintf("Output Base for %s", cell.Position().Reference())),
-					),
-					giu.Spacing(),
-					giu.Separator(),
-					giu.Spacing(),
+				),
+				giu.Menu("Output Base").Layout(
 					outputBase("Binary", 2),
 					outputBase("Octal", 8),
 					outputBase("Decimal", 10),
 					outputBase("Hexadecimal", 16),
-				).Build()
-			}
+				),
+				giu.MenuItem("Reset Bases").
+					Enabled(cellBase != iv.ivy.Base()).
+					OnClick(func() {
+						cell.SetBase(iv.ivy.Base())
+						iv.worksheet.RecalculateAll()
+					}),
+			).Build()
 		}),
 	)
 }

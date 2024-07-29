@@ -14,11 +14,6 @@ var FontAwesome []byte
 // Icon glyphs from FontAwesome
 const (
 	FileMenu = rune(0xf15b)
-
-	// for some reason glyphs from font-awesome do not show in a context menu
-	// (although they do in other areas of the gui). therefore, the rune below
-	// is a glyph in the hack font
-	ParentContextMenu = rune(0x276e)
 )
 
 const (

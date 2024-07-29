@@ -12,6 +12,8 @@ type Position struct {
 	Column int
 }
 
+type Adjustment Position
+
 func (p Position) IsError() bool {
 	return p.Row < 0 || p.Column < 0
 }
@@ -31,6 +33,13 @@ func NumericToBase26(val int) string {
 		val = (val / alphabetSize) - 1
 	}
 	return s
+}
+
+func (p Position) Adjust(adj Adjustment) Position {
+	return Position{
+		Row:    p.Row + adj.Row,
+		Column: p.Column + adj.Column,
+	}
 }
 
 func (p Position) Reference() string {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jetsetilly/ivycel/engine"
+	"github.com/jetsetilly/ivycel/references"
 	"robpike.io/ivy/config"
 	"robpike.io/ivy/exec"
 	"robpike.io/ivy/parse"
@@ -97,7 +98,7 @@ func (iv *Ivy) execute(ex string) (string, error) {
 }
 
 func (iv *Ivy) Execute(ref string, ex string) (string, error) {
-	ref, ex = normaliseCellReferences(ref, ex)
+	ref, ex = references.NormaliseCellReferences(ref, ex)
 
 	_, err := iv.execute(fmt.Sprintf("%s = %s", ref, ex))
 	if err != nil {
@@ -114,7 +115,7 @@ func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 
 // shape of the value at the supplied reference. ref should not be wrapped
 func (iv *Ivy) Shape(ref string) string {
-	ref, _ = normaliseCellReferences(ref, "")
+	ref, _ = references.NormaliseCellReferences(ref, "")
 	s, _ := iv.execute(fmt.Sprintf("rho %s", ref))
 	return s
 }

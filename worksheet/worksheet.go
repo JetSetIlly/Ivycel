@@ -6,6 +6,7 @@ import (
 
 	"github.com/jetsetilly/ivycel/cells"
 	"github.com/jetsetilly/ivycel/engine"
+	"github.com/jetsetilly/ivycel/references"
 )
 
 type User func(cell *cells.Cell)
@@ -59,6 +60,30 @@ func (ws Worksheet) Position(cell cells.CellID) cells.Position {
 	return ws.positions[cell]
 }
 
+func (ws *Worksheet) adjustCells(adj func(p cells.Position) cells.Adjustment) {
+	// rules common to any adjustment that need to be obeyed
+	commonAdj := func(p cells.Position) cells.Adjustment {
+		// use parent's position if the cell has one
+		parent := ws.cellsByID[ws.cellsByPosition[p]].Parent()
+		if parent != nil {
+			p = parent.Position()
+		}
+
+		return adj(p)
+	}
+
+	// change expressions for all cells
+	for rowi := range ws.rows {
+		for coli := range ws.columns {
+			pos := cells.Position{Row: rowi, Column: coli}
+			id := ws.cellsByPosition[pos]
+			cell := ws.cellsByID[id]
+			cell.Entry, _ = references.AdjustReferencesInExpression(cell.Entry, commonAdj)
+			cell.Commit(false)
+		}
+	}
+}
+
 func (ws *Worksheet) InsertRow(at int) {
 	for rowi := ws.rows; rowi >= at; rowi-- {
 		for coli := range ws.columns {
@@ -72,8 +97,15 @@ func (ws *Worksheet) InsertRow(at int) {
 	for coli := range ws.columns {
 		ws.createCell(cells.Position{Row: at, Column: coli})
 	}
+
 	ws.rows++
-	ws.RecalculateAll()
+
+	ws.adjustCells(func(p cells.Position) cells.Adjustment {
+		if p.Row >= at {
+			return cells.Adjustment{Row: 1}
+		}
+		return cells.Adjustment{}
+	})
 }
 
 func (ws *Worksheet) InsertColumn(at int) {
@@ -89,8 +121,15 @@ func (ws *Worksheet) InsertColumn(at int) {
 	for rowi := range ws.rows {
 		ws.createCell(cells.Position{Row: rowi, Column: at})
 	}
+
 	ws.columns++
-	ws.RecalculateAll()
+
+	ws.adjustCells(func(p cells.Position) cells.Adjustment {
+		if p.Column >= at {
+			return cells.Adjustment{Column: 1}
+		}
+		return cells.Adjustment{}
+	})
 }
 
 func (ws Worksheet) Cell(row int, column int) *cells.Cell {

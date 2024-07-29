@@ -12,6 +12,7 @@ import (
 	"github.com/jetsetilly/ivycel/engine"
 	"github.com/jetsetilly/ivycel/engine/ivy"
 	"github.com/jetsetilly/ivycel/fonts"
+	"github.com/jetsetilly/ivycel/references"
 	"github.com/jetsetilly/ivycel/worksheet"
 )
 
@@ -113,14 +114,14 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 
 				giu.Selectable(fmt.Sprintf(" Reference to %s", cell.Position().Reference())).
 					OnClick(func() {
-						iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Position().Reference()))
+						iv.insertIntoCellEdit(references.WrapCellReference(cell.Position().Reference()))
 					}).
 					Build()
 
 				if cell.Parent() != nil {
 					giu.Selectable(fmt.Sprintf(" Reference to parent (%s)", cell.Parent().Position().Reference())).
 						OnClick(func() {
-							iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Parent().Position().Reference()))
+							iv.insertIntoCellEdit(references.WrapCellReference(cell.Parent().Position().Reference()))
 						}).
 						Build()
 
@@ -128,7 +129,7 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 					giu.Selectable(
 						fmt.Sprintf(" Reference to root of %s", cell.Position().Reference())).
 						OnClick(func() {
-							iv.insertIntoCellEdit(ivy.WrapCellReference(
+							iv.insertIntoCellEdit(references.WrapCellReference(
 								fmt.Sprintf("%s%s", cell.Position().Reference(), cell.RootIndex()),
 							))
 						}).
@@ -473,7 +474,7 @@ func (iv *ivycel) layout() {
 
 					ev.OnDClick(giu.MouseButtonLeft, func() {
 						if iv.worksheet.User.(*worksheetUser).editing != nil {
-							iv.insertIntoCellEdit(ivy.WrapCellReference(cell.Position().Reference()))
+							iv.insertIntoCellEdit(references.WrapCellReference(cell.Position().Reference()))
 						} else if !cell.ReadOnly() {
 							iv.worksheet.User.(*worksheetUser).editing = cell
 							iv.worksheet.User.(*worksheetUser).focusCell = true

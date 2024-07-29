@@ -2,6 +2,7 @@ package worksheet
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 
 	"github.com/jetsetilly/ivycel/cells"
@@ -78,7 +79,13 @@ func (ws *Worksheet) adjustCells(adj func(p cells.Position) cells.Adjustment) {
 			pos := cells.Position{Row: rowi, Column: coli}
 			id := ws.cellsByPosition[pos]
 			cell := ws.cellsByID[id]
-			cell.Entry, _ = references.AdjustReferencesInExpression(cell.Entry, commonAdj)
+
+			var err error
+			cell.Entry, err = references.AdjustReferencesInExpression(cell.Entry, commonAdj)
+			if err != nil {
+				log.Printf("worksheet: adjustCells: %s", err.Error())
+			}
+
 			cell.Commit(false)
 		}
 	}

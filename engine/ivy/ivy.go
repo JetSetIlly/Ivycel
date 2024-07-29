@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/jetsetilly/ivycel/engine"
@@ -29,6 +30,11 @@ type Ivy struct {
 
 	base engine.Base
 
+	// currBase is the most recent base setting to be given to ivy. it is not
+	// the same as the base field which should be though of as the current
+	// default base for spreadsheet cells
+	currBase engine.Base
+
 	errorSuppression bool
 	lastErr          error
 }
@@ -47,13 +53,20 @@ func New() Ivy {
 	return iv
 }
 
-// log error normalises the error message and assigns it to the lastErr field.
-// it also returns the lastErr field (ie. the normalised form)
-func (iv *Ivy) logError(err error) error {
-	spl := strings.SplitN(err.Error(), ":", 3)
+func (iv *Ivy) tidyError(err error) error {
+	spl := strings.SplitN(strings.TrimSpace(err.Error()), ": ", 3)
 	if len(spl) > 0 {
 		err = errors.New(spl[len(spl)-1])
 	}
+	return err
+}
+
+// log error normalises the error message and assigns it to the lastErr field.
+// it also returns the normalised form for further use
+//
+// the original error message is also printed with the log package
+func (iv *Ivy) logError(err error) error {
+	err = iv.tidyError(err)
 	if !iv.errorSuppression {
 		iv.lastErr = err
 	}
@@ -66,16 +79,20 @@ func (iv Ivy) LastError() error {
 
 // run the supplied function but with the error suppression flag set
 func (iv *Ivy) WithErrorSupression(with func()) {
+	// calls to WithErrorSuppression() may be nested
+	errorSuppression := iv.errorSuppression
 	iv.errorSuppression = true
 	with()
-	iv.errorSuppression = false
+	iv.errorSuppression = errorSuppression
 }
 
 // run the supplied function but with the error suppression flag set
 func (iv *Ivy) WithNumberBase(base engine.Base, with func()) {
+	// calls to WithNumberBase() may be nested
+	currBase := iv.currBase
 	iv.setBase(base)
 	with()
-	iv.setBase(iv.base)
+	iv.setBase(currBase)
 }
 
 func (iv *Ivy) execute(ex string) (string, error) {
@@ -116,22 +133,34 @@ func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 // shape of the value at the supplied reference. ref should not be wrapped
 func (iv *Ivy) Shape(ref string) string {
 	ref, _ = references.NormaliseCellReferences(ref, "")
-	s, _ := iv.execute(fmt.Sprintf("rho %s", ref))
-	return s
+
+	var shp string
+	var err error
+
+	iv.WithErrorSupression(func() {
+		shp, err = iv.execute(fmt.Sprintf("rho %s", ref))
+		if err != nil {
+			log.Printf("ivy: Shape: %s", iv.tidyError(err))
+		}
+	})
+
+	return shp
 }
 
 func (iv *Ivy) setBase(base engine.Base) {
-	var err error
+	iv.WithErrorSupression(func() {
+		_, err := iv.execute(fmt.Sprintf(")ibase %d", base.Input))
+		if err != nil {
+			log.Printf("ivy: setBase: %s", iv.tidyError(err))
+		}
 
-	_, err = iv.execute(fmt.Sprintf(")ibase %d", base.Input))
-	if err != nil {
-		iv.logError(err)
-	}
+		_, err = iv.execute(fmt.Sprintf(")obase %d", base.Output))
+		if err != nil {
+			log.Printf("ivy: setBase: %s", iv.tidyError(err))
+		}
+	})
 
-	_, err = iv.execute(fmt.Sprintf(")obase %d", base.Output))
-	if err != nil {
-		iv.logError(err)
-	}
+	iv.currBase = base
 }
 
 func (iv *Ivy) SetBase(base engine.Base) {

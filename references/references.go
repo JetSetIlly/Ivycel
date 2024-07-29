@@ -9,7 +9,13 @@ import (
 
 // match anything inside paired braces that begins with a sequence of letters
 // and then a sequence of digits. spaces not allowed at all
-var CellReferenceMatch = regexp.MustCompile("{(([[:alpha:]]+[[:digit:]]+)[[:^space:]]*)}")
+var CellReferenceMatch = regexp.MustCompile("{(([[:alpha:]]+[[:digit:]]+)(?U:[[:^space:]]*))}")
+
+// note about the regex: the non-capturing group around the "[[:^space:]]*" form
+// has the ungreedy flag set. this is because a greedy match would causes
+// problem with an expression like "{A1}+{A2}". there are no spaces between the
+// "{A1" and the closing brace after "A2" and so the match with "[[:^space:]]*
+// would be on "}+{A2"
 
 // list of match positions for CallReferenceMatch
 const (

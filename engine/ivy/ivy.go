@@ -54,9 +54,14 @@ func New() Ivy {
 }
 
 func (iv *Ivy) tidyError(err error) error {
-	spl := strings.SplitN(strings.TrimSpace(err.Error()), ": ", 3)
+	msg := strings.TrimSpace(err.Error())
+	msg = references.EngineToCellReference(msg)
+
+	spl := strings.SplitN(msg, ": ", 3)
 	if len(spl) > 0 {
 		err = errors.New(spl[len(spl)-1])
+	} else {
+		err = errors.New(msg)
 	}
 	return err
 }
@@ -115,7 +120,7 @@ func (iv *Ivy) execute(ex string) (string, error) {
 }
 
 func (iv *Ivy) Execute(ref string, ex string) (string, error) {
-	ref, ex = references.NormaliseCellReferences(ref, ex)
+	ref, ex = references.CellToEngineReference(ref, ex)
 
 	_, err := iv.execute(fmt.Sprintf("%s = %s", ref, ex))
 	if err != nil {
@@ -132,7 +137,7 @@ func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 
 // shape of the value at the supplied reference. ref should not be wrapped
 func (iv *Ivy) Shape(ref string) string {
-	ref, _ = references.NormaliseCellReferences(ref, "")
+	ref, _ = references.CellToEngineReference(ref, "")
 
 	var shp string
 	var err error

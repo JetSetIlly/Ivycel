@@ -19,7 +19,7 @@ import (
 // for adjustment
 //
 // in case of error the unadjusted expression is returned
-func AdjustReferencesInExpression(expression string, adj func(cells.Position) cells.Adjustment) (string, error) {
+func AdjustCellReferencesInExpression(expression string, adj func(cells.Position) cells.Adjustment) (string, error) {
 
 	mtchs := CellReferenceMatch.FindAllStringSubmatch(expression, -1)
 
@@ -37,7 +37,7 @@ func AdjustReferencesInExpression(expression string, adj func(cells.Position) ce
 			return expression, err
 		}
 
-		adjRef, err := AdjustReference(ref, adj(p))
+		adjRef, err := AdjustCellReference(ref, adj(p))
 		if err != nil {
 			return expression, err
 		}

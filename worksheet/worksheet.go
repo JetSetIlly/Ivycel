@@ -81,7 +81,7 @@ func (ws *Worksheet) adjustCells(adj func(p cells.Position) cells.Adjustment) {
 			cell := ws.cellsByID[id]
 
 			var err error
-			cell.Entry, err = references.AdjustReferencesInExpression(cell.Entry, commonAdj)
+			cell.Entry, err = references.AdjustCellReferencesInExpression(cell.Entry, commonAdj)
 			if err != nil {
 				log.Printf("worksheet: adjustCells: %s", err.Error())
 			}

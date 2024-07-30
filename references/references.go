@@ -24,12 +24,10 @@ const (
 	referenceWithoutIndex = 2
 )
 
-var normalisedCellReferencePrefix = "v"
-
 // normalise cell references so they can be used inside of ivy
-func NormaliseCellReferences(ref string, ex string) (string, string) {
-	ref = fmt.Sprintf("%s%s", normalisedCellReferencePrefix, ref)
-	ex = CellReferenceMatch.ReplaceAllString(ex, fmt.Sprintf("%s$1", normalisedCellReferencePrefix))
+func CellToEngineReference(ref string, ex string) (string, string) {
+	ref = fmt.Sprintf("%s%s", EngineReferencePrefix, ref)
+	ex = CellReferenceMatch.ReplaceAllString(ex, fmt.Sprintf("%s$1", EngineReferencePrefix))
 	return ref, ex
 }
 
@@ -41,11 +39,23 @@ func WrapCellReference(ref string) string {
 
 // adjust cell reference by provided adjustment. cell references should not be
 // wrapped. in case of error the unadjusted reference is returned
-func AdjustReference(ref string, adj cells.Adjustment) (string, error) {
+func AdjustCellReference(ref string, adj cells.Adjustment) (string, error) {
 	p, err := cells.PositionFromReference(ref)
 	if err != nil {
 		return ref, err
 	}
 	p = p.Adjust(adj)
 	return p.Reference(), nil
+}
+
+var EngineReferencePrefix = "__"
+
+var EngineReferenceMatch = regexp.MustCompile("__([[:alpha:]]+[[:digit:]]+)")
+
+// normalise engine references so they are presented as a cell reference to the
+// user. the function has been written with the idea of changing an error string
+// so that it is more meaningful. however, it might be useful in other
+// situations, I'm not really sure yet
+func EngineToCellReference(msg string) string {
+	return EngineReferenceMatch.ReplaceAllString(msg, "{$1}")
 }

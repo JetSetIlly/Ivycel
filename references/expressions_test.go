@@ -17,20 +17,21 @@ func TestExpressions(t *testing.T) {
 	var testingTable []test = []test{
 		{
 			from: "{A1} + {B100}",
-			to:   "vA1 + vB100",
+			to:   "__A1 + __B100",
 		},
 		{
 			from: "{A1} + {B100} / {ZZZ2309}",
-			to:   "vA1 + vB100 / vZZZ2309",
+			to:   "__A1 + __B100 / __ZZZ2309",
 		},
 		{
 			from: "{A1} + {B100[1]} / {ZZZ2309[100][203]}",
-			to:   "vA1 + vB100[1] / vZZZ2309[100][203]",
+			to:   "__A1 + __B100[1] / __ZZZ2309[100][203]",
 		},
 	}
 
 	for _, tst := range testingTable {
-		r := references.CellReferenceMatch.ReplaceAllString(tst.from, fmt.Sprintf("%s$1", prefix))
+		r := references.CellReferenceMatch.ReplaceAllString(tst.from,
+			fmt.Sprintf("%s$1", references.EngineReferencePrefix))
 		ExpectEquality(t, r, tst.to)
 	}
 }
@@ -60,7 +61,7 @@ func TestExpressionsAdjustment(t *testing.T) {
 	}
 
 	for _, tst := range testingTable {
-		s, err := references.AdjustReferencesInExpression(tst.from, adj)
+		s, err := references.AdjustCellReferencesInExpression(tst.from, adj)
 		ExpectEquality(t, err, nil)
 		ExpectEquality(t, s, tst.to)
 	}
@@ -94,7 +95,7 @@ func TestExpressionsAdjustmentWithFilter(t *testing.T) {
 	}
 
 	for _, tst := range testingTable {
-		s, err := references.AdjustReferencesInExpression(tst.from, adj)
+		s, err := references.AdjustCellReferencesInExpression(tst.from, adj)
 		ExpectEquality(t, err, nil)
 		ExpectEquality(t, s, tst.to)
 	}

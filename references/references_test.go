@@ -90,9 +90,6 @@ func TestCellReferenceWithIndexing(t *testing.T) {
 	ExpectEquality(t, ok, false)
 }
 
-// the prefix we use for replacement isn't important
-const prefix = "v"
-
 func TestCellReferenceByTable(t *testing.T) {
 	type test struct {
 		inp   string
@@ -101,19 +98,19 @@ func TestCellReferenceByTable(t *testing.T) {
 	}
 
 	var testingTable = []test{
-		{inp: "A1", match: "A1", conv: fmt.Sprintf("%sA1", prefix)},
-		{inp: "ZZ100", match: "ZZ100", conv: fmt.Sprintf("%sZZ100", prefix)},
+		{inp: "A1", match: "A1", conv: fmt.Sprintf("%sA1", references.EngineReferencePrefix)},
+		{inp: "ZZ100", match: "ZZ100", conv: fmt.Sprintf("%sZZ100", references.EngineReferencePrefix)},
 		{inp: " A1"},
 		{inp: "ZZ 100"},
 		{inp: "1A"},
 		{inp: "100ZZ"},
 
 		// indexing tests
-		{inp: "A1[0]", match: "A1[0]", conv: fmt.Sprintf("%sA1[0]", prefix)},
+		{inp: "A1[0]", match: "A1[0]", conv: fmt.Sprintf("%sA1[0]", references.EngineReferencePrefix)},
 
 		// even though we know for sure that [0 is not a valid index we need to
 		// identify it and pass it to ivy for parsing
-		{inp: "A1[0", match: "A1[0", conv: fmt.Sprintf("%sA1[0", prefix)},
+		{inp: "A1[0", match: "A1[0", conv: fmt.Sprintf("%sA1[0", references.EngineReferencePrefix)},
 	}
 
 	var matches [][]string
@@ -126,14 +123,46 @@ func TestCellReferenceByTable(t *testing.T) {
 			ExpectEquality(t, len(matches[0]), 3)
 			ExpectEquality(t, matches[0][1], tst.match)
 
-			r := references.CellReferenceMatch.ReplaceAllString(w, fmt.Sprintf("%s$1", prefix))
+			r := references.CellReferenceMatch.ReplaceAllString(w,
+				fmt.Sprintf("%s$1", references.EngineReferencePrefix))
 			ExpectEquality(t, r, tst.conv)
 		} else {
 			ExpectEquality(t, len(matches), 0)
 
 			// replacement will fail so returned string should equal the wrapped string
-			r := references.CellReferenceMatch.ReplaceAllString(w, fmt.Sprintf("%s$1", prefix))
+			r := references.CellReferenceMatch.ReplaceAllString(w,
+				fmt.Sprintf("%s$1", references.EngineReferencePrefix))
 			ExpectEquality(t, r, w)
 		}
 	}
+}
+
+func TestEngineReference(t *testing.T) {
+	var ok bool
+
+	ok = references.EngineReferenceMatch.MatchString("A1")
+	ExpectEquality(t, ok, false)
+	ok = references.EngineReferenceMatch.MatchString("{A1}")
+	ExpectEquality(t, ok, false)
+
+	ok = references.EngineReferenceMatch.MatchString("__A1")
+	ExpectEquality(t, ok, true)
+	ok = references.EngineReferenceMatch.MatchString("__A1__A2")
+	ExpectEquality(t, ok, true)
+
+	ok = references.EngineReferenceMatch.MatchString("vA1")
+	ExpectEquality(t, ok, false)
+	ok = references.EngineReferenceMatch.MatchString("vA1vA2")
+	ExpectEquality(t, ok, false)
+
+	var msg string
+
+	msg = references.EngineToCellReference("__A1")
+	ExpectEquality(t, msg, "{A1}")
+
+	msg = references.EngineToCellReference("__A1__A2")
+	ExpectEquality(t, msg, "{A1}{A2}")
+
+	msg = references.EngineToCellReference("__A1 + __A2")
+	ExpectEquality(t, msg, "{A1} + {A2}")
 }

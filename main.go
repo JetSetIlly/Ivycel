@@ -226,6 +226,7 @@ func (iv *ivycel) layout() {
 			Size(-1, -1-float32(iv.statusBarHeight)).
 			Freeze(1, 1).
 			Flags(giu.TableFlagsScrollY | giu.TableFlagsScrollX | giu.TableFlagsResizable).
+			FastMode(true).
 			NoHeader(true)
 
 		// prepare columns for adding to table
@@ -592,7 +593,7 @@ func main() {
 		cell.User = &cellUser{}
 	}
 
-	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 30, 30, addCellUser)
+	iv.worksheet = worksheet.NewWorksheet(&iv.ivy, 100, 100, addCellUser)
 	iv.worksheet.User = &worksheetUser{
 		selected:     iv.worksheet.Cell(0, 0),
 		focusFormula: true,

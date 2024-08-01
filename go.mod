@@ -22,4 +22,4 @@ require (
 	gopkg.in/eapache/queue.v1 v1.1.0 // indirect
 )
 
-replace github.com/AllenDang/giu v0.8.1 => github.com/jetsetilly/giu v0.0.1
+replace github.com/AllenDang/giu v0.8.1 => github.com/jetsetilly/giu v0.0.2

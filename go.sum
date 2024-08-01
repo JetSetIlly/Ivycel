@@ -6,8 +6,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/faiface/mainthread v0.0.0-20171120011319-8b78f0a41ae3 h1:baVdMKlASEHrj19iqjARrPbaRisD7EuZEVJj6ZMLl1Q=
 github.com/faiface/mainthread v0.0.0-20171120011319-8b78f0a41ae3/go.mod h1:VEPNJUlxl5KdWjDvz6Q1l+rJlxF2i6xqDeGuGAxa87M=
-github.com/jetsetilly/giu v0.0.1 h1:yv0iJ0ufnR2WQPCc8xg3CqU+EEMCQrMrqrzGdOYJaO4=
-github.com/jetsetilly/giu v0.0.1/go.mod h1:qYmhnSU1qTy/FZEn9B9Td8j/fCuLs7Kz3JwZZXVKk1s=
+github.com/jetsetilly/giu v0.0.2 h1:ZGOGEuWTnVUqtoXNRryPG3YfifcOnpOobO1WGG20KLA=
+github.com/jetsetilly/giu v0.0.2/go.mod h1:qYmhnSU1qTy/FZEn9B9Td8j/fCuLs7Kz3JwZZXVKk1s=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/mazznoer/csscolorparser v0.1.4 h1:1bAWPWdoMc5qdAXVlixS9rpZLw/vaq5InX/lj3tfRQQ=

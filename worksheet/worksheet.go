@@ -92,6 +92,8 @@ func (ws *Worksheet) adjustCells(adj func(p cells.Position) cells.Adjustment) {
 }
 
 func (ws *Worksheet) InsertRow(at int) {
+	defer ws.RecalculateAll()
+
 	for rowi := ws.rows; rowi >= at; rowi-- {
 		for coli := range ws.columns {
 			pos := cells.Position{Row: rowi, Column: coli}
@@ -116,6 +118,8 @@ func (ws *Worksheet) InsertRow(at int) {
 }
 
 func (ws *Worksheet) InsertColumn(at int) {
+	defer ws.RecalculateAll()
+
 	for coli := ws.columns; coli >= at; coli-- {
 		for rowi := range ws.rows {
 			pos := cells.Position{Row: rowi, Column: coli}

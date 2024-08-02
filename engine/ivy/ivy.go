@@ -71,7 +71,6 @@ func (iv *Ivy) tidyError(err error) error {
 //
 // the original error message is also printed with the log package
 func (iv *Ivy) logError(err error) error {
-	err = iv.tidyError(err)
 	if !iv.errorSuppression {
 		iv.lastErr = err
 	}
@@ -122,14 +121,30 @@ func (iv *Ivy) execute(ex string) (string, error) {
 func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 	ref, ex = references.CellToEngineReference(ref, ex)
 
+	if strings.HasPrefix(ex, ")") {
+		return "", iv.logError(errors.New("Special Commands Not Supported"))
+	}
+
+	if strings.HasPrefix(ex, "opdelete ") {
+		return "", iv.logError(errors.New("User-Defined Operations Not Supported"))
+	}
+
+	// check for user-defined operator keyword
+	if strings.HasPrefix(ex, "op ") {
+		return "", iv.logError(errors.New("User-Defined Operations Not Supported"))
+	}
+
+	// other expressions are executed and assigned to a variable name
+	// representing a cell
+
 	_, err := iv.execute(fmt.Sprintf("%s = %s", ref, ex))
 	if err != nil {
-		return "", iv.logError(err)
+		return "", iv.logError(iv.tidyError(err))
 	}
 
 	result, err := iv.execute(ref)
 	if err != nil {
-		return "", iv.logError(err)
+		return "", iv.logError(iv.tidyError(err))
 	}
 
 	return result, nil

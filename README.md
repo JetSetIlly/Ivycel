@@ -25,10 +25,10 @@ changed at all.
 All Ivy expressions should work except the "special commands" and the `op` and
 `opdelete` commands. 
 
-The GUI is written using [GIU](https://github.com/AllenDang/giu) which itself is based
-on [Dear Imgui](https://github.com/ocornut/imgui). At the moment, Ivycel has been repointed
-to my own fork which contains some important patches. These patches have been accepted by the
-main project but until they have been tagged the redirect remains in the go.mod file.
+The GUI is created using [GIU](https://github.com/AllenDang/giu) which itself is based on [Dear Imgui](https://github.com/ocornut/imgui). Unfortunatly, GIU has additional development requirements see [the 'install' instructions for GIU](https://github.com/AllenDang/giu?tab=readme-ov-file#install) for more information.
+
+Currently, the GUI code is entirely in the main.go file and definitely
+requires tidying and clarifying.
 
 ### Demonstration Videos
 

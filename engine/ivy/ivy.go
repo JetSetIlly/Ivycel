@@ -120,18 +120,31 @@ func (iv *Ivy) execute(ex string) (string, error) {
 
 func (iv *Ivy) Execute(ref string, ex string) (string, error) {
 	ref, ex = references.CellToEngineReference(ref, ex)
+	if ref == "" {
+		return "", iv.logError(errors.New("invalid cell reference"))
+	}
+
+	// handle the empty string
+	ex = strings.TrimSpace(ex)
+	if ex == "" {
+		_, err := iv.execute(fmt.Sprintf("%s = 0", ref))
+		if err != nil {
+			return "", iv.logError(iv.tidyError(err))
+		}
+		return "", nil
+	}
 
 	if strings.HasPrefix(ex, ")") {
-		return "", iv.logError(errors.New("Special Commands Not Supported"))
+		return "", iv.logError(errors.New("special commands not supported"))
 	}
 
 	if strings.HasPrefix(ex, "opdelete ") {
-		return "", iv.logError(errors.New("User-Defined Operations Not Supported"))
+		return "", iv.logError(errors.New("user-defined operations not supported"))
 	}
 
 	// check for user-defined operator keyword
 	if strings.HasPrefix(ex, "op ") {
-		return "", iv.logError(errors.New("User-Defined Operations Not Supported"))
+		return "", iv.logError(errors.New("user-defined operations not supported"))
 	}
 
 	// other expressions are executed and assigned to a variable name

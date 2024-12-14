@@ -8,7 +8,8 @@ import (
 	"github.com/jetsetilly/ivycel/engine"
 )
 
-var UnsupportedShape = errors.New("unsupported shape")
+var UnsupportedShape = errors.New("result is an unsupported shape")
+var PartlyObscured = errors.New("result is partly obscured")
 
 type CellID string
 
@@ -27,6 +28,7 @@ type Cell struct {
 	Entry  string
 	result string
 	err    error
+	warn   error
 
 	parent   *Cell
 	children []*Cell
@@ -70,6 +72,7 @@ func (c *Cell) Commit(force bool) {
 	// reset other fields
 	c.result = ""
 	c.err = nil
+	c.warn = nil
 	c.parent = nil
 
 	// if entry is empty then we don't need to do any more except tidy up
@@ -165,6 +168,12 @@ func (c *Cell) Commit(force bool) {
 				break // for loop
 			}
 
+			// don't overwrite existing results
+			if rel.result != "" {
+				c.warn = PartlyObscured
+				break // for loop
+			}
+
 			c.children = append(c.children, rel)
 			rel.Entry = strings.TrimSpace(cv)
 			rel.parent = c
@@ -190,7 +199,23 @@ func (c *Cell) Result() string {
 }
 
 func (c *Cell) Error() error {
-	return c.err
+	if c.err != nil {
+		return c.err
+	}
+	if c.parent != nil {
+		return c.parent.Error()
+	}
+	return nil
+}
+
+func (c *Cell) Warning() error {
+	if c.warn != nil {
+		return c.warn
+	}
+	if c.parent != nil {
+		return c.parent.Warning()
+	}
+	return nil
 }
 
 // if cell has a parent then it should be treated as read-only

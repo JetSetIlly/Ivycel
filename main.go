@@ -412,6 +412,9 @@ func (iv *ivycel) layout() {
 					} else {
 						cel = giu.Button(cell.Result())
 						tip = giu.Custom(func() {})
+						if warn := cell.Warning(); warn != nil {
+							tip = giu.Tooltip(warn.Error())
+						}
 					}
 
 					// each cell is the width of the column it is in and the

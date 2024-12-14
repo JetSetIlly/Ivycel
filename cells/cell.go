@@ -236,6 +236,7 @@ func (c *Cell) SetBase(b engine.Base) {
 		return
 	}
 	c.base = b
+	c.Commit(false)
 }
 
 // return the index for the root value of the cell depending on the shape of the value

@@ -149,14 +149,12 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 	inputBase := func(label string, newBase int) giu.Widget {
 		return giu.MenuItem(label).Selected(cellBase.Input == newBase).OnClick(func() {
 			cell.SetBase(engine.Base{Input: newBase, Output: cellBase.Output})
-			iv.worksheet.RecalculateAll()
 		})
 	}
 
 	outputBase := func(label string, newBase int) giu.Widget {
 		return giu.MenuItem(label).Selected(cellBase.Output == newBase).OnClick(func() {
 			cell.SetBase(engine.Base{Input: cellBase.Input, Output: newBase})
-			iv.worksheet.RecalculateAll()
 		})
 	}
 
@@ -182,19 +180,33 @@ func (iv *ivycel) cellContextMenu(cell *cells.Cell) giu.Widget {
 					inputBase("Octal", 8),
 					inputBase("Decimal", 10),
 					inputBase("Hexadecimal", 16),
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+					giu.MenuItem("Reset").
+						Enabled(cellBase != iv.ivy.Base()).
+						OnClick(func() {
+							base := cellBase
+							base.Input = iv.ivy.Base().Input
+							cell.SetBase(base)
+						}),
 				),
 				giu.Menu("Output Base").Layout(
 					outputBase("Binary", 2),
 					outputBase("Octal", 8),
 					outputBase("Decimal", 10),
 					outputBase("Hexadecimal", 16),
+					giu.Spacing(),
+					giu.Separator(),
+					giu.Spacing(),
+					giu.MenuItem("Reset").
+						Enabled(cellBase != iv.ivy.Base()).
+						OnClick(func() {
+							base := cellBase
+							base.Output = iv.ivy.Base().Output
+							cell.SetBase(base)
+						}),
 				),
-				giu.MenuItem("Reset Bases").
-					Enabled(cellBase != iv.ivy.Base()).
-					OnClick(func() {
-						cell.SetBase(iv.ivy.Base())
-						iv.worksheet.RecalculateAll()
-					}),
 			).Build()
 		}),
 	)
